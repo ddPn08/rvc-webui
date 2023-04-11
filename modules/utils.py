@@ -1,5 +1,6 @@
 import ffmpeg
 import numpy as np
+import torch
 
 
 def load_audio(file, sr):
@@ -19,3 +20,8 @@ def load_audio(file, sr):
         raise RuntimeError(f"Failed to load audio: {e}")
 
     return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+
+
+def get_gpus():
+    num_gpus = torch.cuda.device_count()
+    return [torch.device(f"cuda:{i}") for i in range(num_gpus)]

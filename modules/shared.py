@@ -3,7 +3,7 @@ import os
 import torch
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODULES_DIR = os.path.join(ROOT_DIR, "modules")
+MODELS_DIR = os.path.join(ROOT_DIR, "models")
 
 is_half = False
 

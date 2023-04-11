@@ -6,7 +6,7 @@ from modules import models
 
 
 def title():
-    return "Infer"
+    return "Inference"
 
 
 def tab():
