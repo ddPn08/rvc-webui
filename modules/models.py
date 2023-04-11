@@ -5,8 +5,7 @@ import torch
 from fairseq import checkpoint_utils
 
 from .cmd_opts import opts
-from .inference.models import (SynthesizerTrnMs256NSFsid,
-                               SynthesizerTrnMs256NSFsid_nono)
+from .inference.models import SynthesizerTrnMs256NSFsid, SynthesizerTrnMs256NSFsid_nono
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
 from .utils import load_audio

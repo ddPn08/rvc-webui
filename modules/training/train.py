@@ -1,17 +1,17 @@
-from typing import *
 import os
 import traceback
 from random import shuffle
+from typing import *
 
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
+import tqdm
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import torch.multiprocessing as mp
-import tqdm
 
 from ..inference import commons
 from ..inference.models import (
@@ -19,6 +19,7 @@ from ..inference.models import (
     SynthesizerTrnMs256NSFsid,
     SynthesizerTrnMs256NSFsid_nono,
 )
+from ..models import MODELS_DIR
 from . import utils
 from .data_utils import (
     DistributedBucketSampler,
@@ -30,7 +31,6 @@ from .data_utils import (
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .process_ckpt import save
-from ..models import MODELS_DIR
 
 
 def run_training(
