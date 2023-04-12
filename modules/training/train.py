@@ -197,7 +197,7 @@ def run(
         global_step = (epoch - 1) * len(train_loader)
     except:  # 如果首次不能加载，加载pretrain
         traceback.print_exc()
-        epoch = 0
+        epoch = 1
         global_step = 0
         if is_main_process:
             print(f"loaded pretrained {hps.pretrainG} {hps.pretrainD}")
@@ -214,10 +214,10 @@ def run(
         )
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
-        optim_g, gamma=hps.train.lr_decay, last_epoch=epoch - 1
+        optim_g, gamma=hps.train.lr_decay, last_epoch=epoch - 2
     )
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(
-        optim_d, gamma=hps.train.lr_decay, last_epoch=epoch - 1
+        optim_d, gamma=hps.train.lr_decay, last_epoch=epoch - 2
     )
 
     scaler = GradScaler(enabled=hps.train.fp16_run)
@@ -225,7 +225,7 @@ def run(
     cache = []
     progress_bar = tqdm.tqdm(range((hps.total_epoch - epoch) * len(train_loader)))
     progress_bar.set_postfix(epoch=epoch)
-    for epoch in range(epoch, hps.total_epoch):
+    for epoch in range(epoch, hps.total_epoch + 1):
         train_loader.batch_sampler.set_epoch(epoch)
 
         net_g.train()
