@@ -40,10 +40,17 @@ def tab():
     ):
         has_pitch_guidance = has_pitch_guidance == "Yes"
         training_dir = os.path.join(MODELS_DIR, "training", model_name)
+        yield f"Training directory: {training_dir}"
+
+        yield "Preprocessing..."
         preprocess_trainset(
             dataset_dir, SR_DICT[target_sr], num_cpu_process, model_name
         )
+
+        yield "Extracting f0..."
         extract_f0(model_name, num_cpu_process, pitch_extraction_algo)
+
+        yield "Extracting features..."
         extract_feature(model_name)
 
         gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
@@ -105,6 +112,8 @@ def tab():
         with open(os.path.join(training_dir, "filelist.txt"), "w") as f:
             f.write("\n".join(opt))
 
+        yield "Training..."
+
         run_training(
             gpu_id.split(","),
             model_name,
@@ -121,7 +130,7 @@ def tab():
         npys = []
         listdir_res = list(os.listdir(feature_dir))
         for name in sorted(listdir_res):
-            phone = np.load("%s/%s" % (feature_dir, name))
+            phone = np.load(os.path.join(feature_dir, name))
             npys.append(phone)
         big_npy = np.concatenate(npys, 0)
         np.save(os.path.join(training_dir, "total_fea.npy"), big_npy)
@@ -209,7 +218,7 @@ def tab():
                 with gr.Row().style(equal_height=False):
                     status = gr.Textbox(value="", label="Status")
                 with gr.Row().style(equal_height=False):
-                    train_button = gr.Button("Train")
+                    train_button = gr.Button("Train", variant="primary")
 
     train_button.click(
         train,

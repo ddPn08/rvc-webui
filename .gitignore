@@ -1,2 +1,7 @@
-__pycache__
+.DS_Store
+
+__pycache__/
+venv/
+tmp/
+
 models/hubert_base.pt

@@ -33,13 +33,12 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
             new_state_dict[k] = saved_state_dict[k]
             if saved_state_dict[k].shape != state_dict[k].shape:
                 print(
-                    "shape-%s-mismatch|need-%s|get-%s"
-                    % (k, state_dict[k].shape, saved_state_dict[k].shape)
-                )  #
+                    f"shape-{k}-mismatch|need-{state_dict[k].shape}|get-{saved_state_dict[k].shape}"
+                )
                 raise KeyError
         except:
             # print(traceback.format_exc())
-            print("%s is not in the checkpoint" % k)  # pretrain缺失的
+            print(f"{k} is not in the checkpoint")
             new_state_dict[k] = v  # 模型自带的随机值
     if hasattr(model, "module"):
         model.module.load_state_dict(new_state_dict, strict=False)
@@ -269,21 +268,6 @@ def check_git_hash(model_dir):
             )
     else:
         open(path, "w").write(cur_hash)
-
-
-def get_logger(model_dir, filename="train.log"):
-    global logger
-    logger = logging.getLogger(os.path.basename(model_dir))
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter("%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s")
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    h = logging.FileHandler(os.path.join(model_dir, filename))
-    h.setLevel(logging.DEBUG)
-    h.setFormatter(formatter)
-    logger.addHandler(h)
-    return logger
 
 
 class HParams:

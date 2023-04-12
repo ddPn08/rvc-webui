@@ -5,6 +5,45 @@ import gradio as gr
 from modules import models
 
 
+def inference_options_ui():
+    with gr.Row().style(equal_height=False):
+        with gr.Column():
+            source_audio = gr.Textbox(label="Source Audio")
+        with gr.Column():
+            transpose = gr.Slider(
+                minimum=-20, maximum=20, value=0, step=1, label="Transpose"
+            )
+            pitch_extraction_algo = gr.Radio(
+                choices=["pm", "harvest"],
+                value="pm",
+                label="Pitch Extraction Algorithm",
+            )
+        with gr.Column():
+            feature_retrieval_lib = gr.Textbox(
+                value="", label="Feature Retrieval Library"
+            )
+            feature_file_path = gr.Textbox(value="", label="Feature File Path")
+            retrieval_feature_ratio = gr.Slider(
+                minimum=0,
+                maximum=1,
+                value=1,
+                step=0.01,
+                label="Retrieval Feature Ratio",
+            )
+        with gr.Column():
+            fo_curve_file = gr.File(label="F0 Curve File")
+
+    return (
+        source_audio,
+        transpose,
+        pitch_extraction_algo,
+        feature_retrieval_lib,
+        feature_file_path,
+        retrieval_feature_ratio,
+        fo_curve_file,
+    )
+
+
 def title():
     return "Inference"
 
@@ -60,8 +99,7 @@ def tab():
             )
             return "Success", (model.tgt_sr, audio)
         except:
-            info = traceback.format_exc()
-            return "Error: " + info, None
+            return "Error: " + traceback.format_exc(), None
 
     with gr.Group():
         with gr.Box():
@@ -86,34 +124,15 @@ def tab():
                     model.change(load_model, inputs=[model], outputs=[speaker_id])
                     reload_model_button.click(reload_model, outputs=[model])
 
-                with gr.Row().style(equal_height=False):
-                    with gr.Column():
-                        source_audio = gr.Textbox(label="Source Audio")
-                    with gr.Column():
-                        transpose = gr.Slider(
-                            minimum=-20, maximum=20, value=0, step=1, label="Transpose"
-                        )
-                        pitch_extraction_algo = gr.Radio(
-                            choices=["pm", "harvest"],
-                            value="pm",
-                            label="Pitch Extraction Algorithm",
-                        )
-                    with gr.Column():
-                        feature_retrieval_lib = gr.Textbox(
-                            value="", label="Feature Retrieval Library"
-                        )
-                        feature_file_path = gr.Textbox(
-                            value="", label="Feature File Path"
-                        )
-                        retrieval_feature_ratio = gr.Slider(
-                            minimum=0,
-                            maximum=1,
-                            value=1,
-                            step=0.01,
-                            label="Retrieval Feature Ratio",
-                        )
-                    with gr.Column():
-                        fo_curve_file = gr.File(label="F0 Curve File")
+                (
+                    source_audio,
+                    transpose,
+                    pitch_extraction_algo,
+                    feature_retrieval_lib,
+                    feature_file_path,
+                    retrieval_feature_ratio,
+                    fo_curve_file,
+                ) = inference_options_ui()
 
                 with gr.Row().style(equal_height=False):
                     with gr.Column():
@@ -136,4 +155,5 @@ def tab():
             retrieval_feature_ratio,
         ],
         outputs=[status, output],
+        queue=True,
     )

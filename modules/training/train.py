@@ -16,8 +16,8 @@ from torch.utils.tensorboard import SummaryWriter
 from ..inference import commons
 from ..inference.models import (
     MultiPeriodDiscriminator,
-    SynthesizerTrnMs256NSFsid,
-    SynthesizerTrnMs256NSFsid_nono,
+    SynthesizerTrnMs256NSFSid,
+    SynthesizerTrnMs256NSFSidNono,
 )
 from ..models import MODELS_DIR
 from . import utils
@@ -46,10 +46,6 @@ def run_training(
     save_only_last: bool = False,
     cache_in_gpu: bool = False,
 ):
-    deterministic = torch.backends.cudnn.deterministic
-    benchmark = torch.backends.cudnn.benchmark
-    torch.backends.cudnn.deterministic = False
-    torch.backends.cudnn.benchmark = False
     training_dir = os.path.join(MODELS_DIR, "training", model_name)
     hps = utils.get_hparams(
         model_name,
@@ -65,10 +61,17 @@ def run_training(
         save_only_last,
         cache_in_gpu,
     )
+
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "5555"
 
+    deterministic = torch.backends.cudnn.deterministic
+    benchmark = torch.backends.cudnn.benchmark
     PREV_CUDA_VISIBLE_DEVICES = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = False
+
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
 
     mp.spawn(
@@ -137,7 +140,7 @@ def run(
         prefetch_factor=8,
     )
     if hps.if_f0 == 1:
-        net_g = SynthesizerTrnMs256NSFsid(
+        net_g = SynthesizerTrnMs256NSFSid(
             hps.data.filter_length // 2 + 1,
             hps.train.segment_size // hps.data.hop_length,
             **hps.model,
@@ -145,7 +148,7 @@ def run(
             sr=hps.sample_rate,
         )
     else:
-        net_g = SynthesizerTrnMs256NSFsid_nono(
+        net_g = SynthesizerTrnMs256NSFSidNono(
             hps.data.filter_length // 2 + 1,
             hps.train.segment_size // hps.data.hop_length,
             **hps.model,
@@ -192,11 +195,9 @@ def run(
             optim_g,
         )
         global_step = (epoch - 1) * len(train_loader)
-        # epoch_str = 1
-        # global_step = 0
     except:  # 如果首次不能加载，加载pretrain
         traceback.print_exc()
-        epoch = 1
+        epoch = 0
         global_step = 0
         if is_main_process:
             print(f"loaded pretrained {hps.pretrainG} {hps.pretrainD}")
@@ -213,16 +214,16 @@ def run(
         )
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
-        optim_g, gamma=hps.train.lr_decay, last_epoch=epoch - 2
+        optim_g, gamma=hps.train.lr_decay, last_epoch=epoch - 1
     )
     scheduler_d = torch.optim.lr_scheduler.ExponentialLR(
-        optim_d, gamma=hps.train.lr_decay, last_epoch=epoch - 2
+        optim_d, gamma=hps.train.lr_decay, last_epoch=epoch - 1
     )
 
     scaler = GradScaler(enabled=hps.train.fp16_run)
 
     cache = []
-    progress_bar = tqdm.tqdm(range((hps.total_epoch - 1 - epoch) * len(train_loader)))
+    progress_bar = tqdm.tqdm(range((hps.total_epoch - epoch) * len(train_loader)))
     progress_bar.set_postfix(epoch=epoch)
     for epoch in range(epoch, hps.total_epoch):
         train_loader.batch_sampler.set_epoch(epoch)
@@ -444,7 +445,6 @@ def run(
                             scalars=scalar_dict,
                         )
                 global_step += 1
-            # if global_step % hps.train.eval_interval == 0:
             if epoch % hps.save_every_epoch == 0 and is_main_process:
                 if hps.if_latest == 0:
                     utils.save_checkpoint(

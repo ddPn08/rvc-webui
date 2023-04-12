@@ -6,6 +6,7 @@ import importlib.util
 python = sys.executable
 git = os.environ.get("GIT", "git")
 index_url = os.environ.get("INDEX_URL", "")
+stored_commit_hash = None
 skip_install = False
 
 
@@ -49,6 +50,20 @@ def is_installed(package):
     return spec is not None
 
 
+def commit_hash():
+    global stored_commit_hash
+
+    if stored_commit_hash is not None:
+        return stored_commit_hash
+
+    try:
+        stored_commit_hash = run(f"{git} rev-parse HEAD").strip()
+    except Exception:
+        stored_commit_hash = "<none>"
+
+    return stored_commit_hash
+
+
 def run_pip(args, desc=None):
     if skip_install:
         return
@@ -70,6 +85,11 @@ def extract_arg(args, name):
 
 
 def prepare_environment():
+    commit = commit_hash()
+
+    print(f"Python {sys.version}")
+    print(f"Commit hash: {commit}")
+
     torch_command = os.environ.get(
         "TORCH_COMMAND",
         "pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118",
@@ -106,9 +126,9 @@ def prepare_environment():
 
 
 def start():
-    import webui
-
-    webui.webui()
+    subprocess.run(
+        [python, "webui.py", *sys.argv[1:]],
+    )
 
 
 if __name__ == "__main__":

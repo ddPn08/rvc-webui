@@ -116,8 +116,6 @@ def extract_f0(model_name: str, num_processes: int, f0_method: str):
     feature_input = FeatureInput()
     paths = []
     dataset_dir = os.path.join(training_dir, "1_16k_wavs")
-    # opt_root1="%s/2a_f0"%(exp_dir)
-    # opt_root2="%s/2b-f0nsf"%(exp_dir)
     opt_dir_f0 = os.path.join(training_dir, "2a_f0")
     opt_dir_f0_nsf = os.path.join(training_dir, "2b_f0nsf")
 
@@ -128,14 +126,12 @@ def extract_f0(model_name: str, num_processes: int, f0_method: str):
     os.makedirs(opt_dir_f0_nsf, exist_ok=True)
 
     for name in sorted(list(os.listdir(dataset_dir))):
-        inp_path = "%s/%s" % (dataset_dir, name)
-        if "spec" in inp_path:
+        dir = os.path.join(dataset_dir, name)
+        if "spec" in dir:
             continue
-        # opt_path1="%s/%s"%(opt_root1,name)
-        # opt_path2="%s/%s"%(opt_root2,name)
         opt_filepath_f0 = os.path.join(opt_dir_f0, name)
         opt_filepath_f0_nsf = os.path.join(opt_dir_f0_nsf, name)
-        paths.append([inp_path, opt_filepath_f0, opt_filepath_f0_nsf])
+        paths.append([dir, opt_filepath_f0, opt_filepath_f0_nsf])
 
     ps = []
     for i in range(num_processes):
@@ -194,8 +190,6 @@ def extract_feature(model_name: str):
         for file in todo:
             try:
                 if file.endswith(".wav"):
-                    # wav_path = "%s/%s" % (wav_path, file)
-                    # out_path = "%s/%s" % (out_path), file.replace("wav", "npy")
                     wav_filepath = os.path.join(wav_dir, file)
                     out_filepath = os.path.join(out_dir, file.replace("wav", "npy"))
 

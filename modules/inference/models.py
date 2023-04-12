@@ -524,7 +524,7 @@ sr2sr = {
 }
 
 
-class SynthesizerTrnMs256NSFsid(nn.Module):
+class SynthesizerTrnMs256NSFSid(nn.Module):
     def __init__(
         self,
         spec_channels,
@@ -635,7 +635,7 @@ class SynthesizerTrnMs256NSFsid(nn.Module):
         return o, x_mask, (z, z_p, m_p, logs_p)
 
 
-class SynthesizerTrnMs256NSFsid_nono(nn.Module):
+class SynthesizerTrnMs256NSFSidNono(nn.Module):
     def __init__(
         self,
         spec_channels,
@@ -737,7 +737,7 @@ class SynthesizerTrnMs256NSFsid_nono(nn.Module):
         return o, x_mask, (z, z_p, m_p, logs_p)
 
 
-class SynthesizerTrnMs256NSFsid_sim(nn.Module):
+class SynthesizerTrnMs256NSFSidSim(nn.Module):
     """
     Synthesizer for Training
     """

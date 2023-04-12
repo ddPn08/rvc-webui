@@ -30,11 +30,6 @@ class PreProcess:
         self.alpha = 0.8
 
         self.training_dir = os.path.join(MODELS_DIR, "training", model_name)
-        # self.gt_wavs_dir = "%s/0_gt_wavs" % model_name
-        # self.wavs16k_dir = "%s/1_16k_wavs" % model_name
-        # self.f = open("%s/preprocess.log" % model_name, "a+")
-        # os.makedirs(self.gt_wavs_dir, exist_ok=True)
-        # os.makedirs(self.wavs16k_dir, exist_ok=True)
         self.gt_wavs_dir = os.path.join(self.training_dir, "0_gt_wavs")
         self.wavs16k_dir = os.path.join(self.training_dir, "1_16k_wavs")
 
@@ -43,15 +38,13 @@ class PreProcess:
             1 - self.alpha
         ) * tmp_audio
         wavfile.write(
-            # "%s/%s_%s.wav" % (self.gt_wavs_dir, idx0, idx1),
-            os.path.join(self.gt_wavs_dir, "%s_%s.wav" % (idx0, idx1)),
+            os.path.join(self.gt_wavs_dir, f"{idx0}_{idx1}.wav"),
             self.sr,
             (tmp_audio * 32768).astype(np.int16),
         )
         tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)
         wavfile.write(
-            # "%s/%s_%s.wav" % (self.wavs16k_dir, idx0, idx1),
-            os.path.join(self.wavs16k_dir, "%s_%s.wav" % (idx0, idx1)),
+            os.path.join(self.wavs16k_dir, f"{idx0}_{idx1}.wav"),
             16000,
             (tmp_audio * 32768).astype(np.int16),
         )
@@ -74,7 +67,6 @@ class PreProcess:
                         break
                 self.norm_write(tmp_audio, idx0, idx1)
         except:
-            # print("%s->%s" % (path, traceback.format_exc()))
             print(f"{path}->{traceback.format_exc()}")
 
     def pipeline_mp(self, infos):
@@ -85,10 +77,6 @@ class PreProcess:
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
         os.makedirs(self.wavs16k_dir, exist_ok=True)
         try:
-            # infos = [
-            #     ("%s/%s" % (dataset_dir, name), idx)
-            #     for idx, name in enumerate(sorted(list(os.listdir(dataset_dir))))
-            # ]
             infos = [
                 (os.path.join(dataset_dir, name), idx)
                 for idx, name in enumerate(sorted(list(os.listdir(dataset_dir))))
@@ -96,7 +84,7 @@ class PreProcess:
             for i in range(num_processes):
                 self.pipeline_mp(infos[i::num_processes])
         except:
-            print("Fail. %s" % traceback.format_exc())
+            print(f"Failed {dataset_dir}->{traceback.format_exc()}")
 
 
 def preprocess_trainset(dataset_dir, sampling_rate, num_processes, model_name):

@@ -1,11 +1,13 @@
+import asyncio
 import os
 from typing import *
 
+import requests
 import torch
 from fairseq import checkpoint_utils
 
 from .cmd_opts import opts
-from .inference.models import SynthesizerTrnMs256NSFsid, SynthesizerTrnMs256NSFsid_nono
+from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
 from .utils import load_audio
@@ -20,9 +22,9 @@ class VC_MODEL:
         weight["config"][-3] = weight["weight"]["emb_g.weight"].shape[0]
 
         if f0 == 1:
-            self.net_g = SynthesizerTrnMs256NSFsid(*weight["config"], is_half=is_half)
+            self.net_g = SynthesizerTrnMs256NSFSid(*weight["config"], is_half=is_half)
         else:
-            self.net_g = SynthesizerTrnMs256NSFsid_nono(*weight["config"])
+            self.net_g = SynthesizerTrnMs256NSFSidNono(*weight["config"])
 
         del self.net_g.enc_q
 
@@ -56,7 +58,7 @@ class VC_MODEL:
         if hubert_model == None:
             load_hubert()
         f0 = self.weight.get("f0", 1)
-        audio_opt = self.vc.pipeline(
+        audio_opt = self.vc(
             hubert_model,
             self.net_g,
             sid,
@@ -78,10 +80,44 @@ vc_model: Optional[VC_MODEL] = None
 hubert_model = None
 
 
+def download_models():
+    def donwload_file(url, out):
+        req = requests.get(url, allow_redirects=True)
+        with open(out, "wb") as f:
+            f.write(req.content)
+
+    loop = asyncio.new_event_loop()
+    tasks = []
+    for template in [
+        "D{}k",
+        "G{}k",
+        "f0D{}k",
+        "f0G{}k",
+    ]:
+        for sr in ["32", "40", "48"]:
+            url = f"https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/{template.format(sr)}.pth"
+            out = os.path.join(MODELS_DIR, "pretrained", f"{template.format(sr)}.pth")
+            if os.path.exists(out):
+                continue
+            tasks.append(loop.run_in_executor(None, donwload_file, url, out))
+
+    if len(tasks) > 0:
+        loop.run_until_complete(asyncio.gather(*tasks))
+
+    url = "https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/hubert_base.pt"
+    out = os.path.join(MODELS_DIR, "hubert_base.pt")
+    if not os.path.exists(out):
+        donwload_file(url, out)
+
+
 def get_models():
-    dir = os.path.join(ROOT_DIR, "models", "weights")
+    dir = os.path.join(ROOT_DIR, "models", "checkpoints")
     os.makedirs(dir, exist_ok=True)
-    return [file for file in os.listdir(dir) if file.endswith(".pth")]
+    return [
+        file
+        for file in os.listdir(dir)
+        if any([x for x in [".ckpt", ".pth"] if file.endswith(x)])
+    ]
 
 
 def load_hubert():
@@ -101,6 +137,6 @@ def load_hubert():
 
 def load_model(model_name: str):
     global vc_model
-    model_path = os.path.join(MODELS_DIR, "weights", model_name)
+    model_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     weight = torch.load(model_path, map_location="cpu")
     vc_model = VC_MODEL(model_name, weight)

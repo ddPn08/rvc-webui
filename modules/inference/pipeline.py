@@ -181,7 +181,7 @@ class VC(object):
         times[2] += t2 - t1
         return audio1
 
-    def pipeline(
+    def __call__(
         self,
         model,
         net_g,
