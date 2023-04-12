@@ -1,7 +1,11 @@
 import subprocess
 import os
 import sys
+import shlex
 import importlib.util
+
+commandline_args = os.environ.get('COMMANDLINE_ARGS', "")
+sys.argv += shlex.split(commandline_args)
 
 python = sys.executable
 git = os.environ.get("GIT", "git")
