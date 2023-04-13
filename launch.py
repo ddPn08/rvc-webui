@@ -4,7 +4,7 @@ import sys
 import shlex
 import importlib.util
 
-commandline_args = os.environ.get('COMMANDLINE_ARGS', "")
+commandline_args = os.environ.get("COMMANDLINE_ARGS", "")
 sys.argv += shlex.split(commandline_args)
 
 python = sys.executable
@@ -130,6 +130,11 @@ def prepare_environment():
 
 
 def start():
+    os.environ["PATH"] = (
+        os.path.join(os.path.dirname(__file__), "bin")
+        + os.pathsep
+        + os.environ.get("PATH", "")
+    )
     subprocess.run(
         [python, "webui.py", *sys.argv[1:]],
     )
