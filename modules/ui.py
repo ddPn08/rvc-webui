@@ -11,7 +11,7 @@ from .shared import ROOT_DIR
 
 def load_tabs():
     tabs = []
-    for file in ["inference.py", "training.py", "merge.py"]:
+    for file in ["inference.py", "training.py", "merge.py", "separate.py"]:
         module_name = file[:-3]
         tabs.append(importlib.import_module(f"modules.tabs.{module_name}"))
     return tabs

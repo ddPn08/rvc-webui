@@ -1,5 +1,6 @@
 import ffmpeg
 import numpy as np
+import requests
 import torch
 
 
@@ -25,3 +26,9 @@ def load_audio(file, sr):
 def get_gpus():
     num_gpus = torch.cuda.device_count()
     return [torch.device(f"cuda:{i}") for i in range(num_gpus)]
+
+
+def donwload_file(url, out):
+    req = requests.get(url, allow_redirects=True)
+    with open(out, "wb") as f:
+        f.write(req.content)

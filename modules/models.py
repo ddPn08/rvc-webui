@@ -2,7 +2,6 @@ import asyncio
 import os
 from typing import *
 
-import requests
 import torch
 from fairseq import checkpoint_utils
 
@@ -10,7 +9,7 @@ from .cmd_opts import opts
 from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
-from .utils import load_audio
+from .utils import load_audio, donwload_file
 
 
 class VC_MODEL:
@@ -81,11 +80,6 @@ hubert_model = None
 
 
 def download_models():
-    def donwload_file(url, out):
-        req = requests.get(url, allow_redirects=True)
-        with open(out, "wb") as f:
-            f.write(req.content)
-
     loop = asyncio.new_event_loop()
     tasks = []
     for template in [
