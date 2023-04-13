@@ -35,4 +35,4 @@ Run the installer and select `C++ Build Tools` in the `Workloads` tab.
 
 # Credits
 - [`liujing04/Retrieval-based-Voice-Conversion-WebUI`](https://github.com/liujing04/Retrieval-based-Voice-Conversion-WebUI)
-- [`Voice_Separation_and_Selection`](https://github.com/teftef6220/Voice_Separation_and_Selection)
+- [`teftef6220/Voice_Separation_and_Selection`](https://github.com/teftef6220/Voice_Separation_and_Selection)
