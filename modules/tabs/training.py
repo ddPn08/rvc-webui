@@ -2,9 +2,7 @@ import os
 import shutil
 from multiprocessing import cpu_count
 
-import faiss
 import gradio as gr
-import numpy as np
 
 from modules import utils
 from modules.shared import MODELS_DIR
@@ -133,26 +131,26 @@ def tab():
             pre_trained_bottom_model_d,
         )
 
-        feature_dir = os.path.join(training_dir, "3_feature256")
-        npys = []
-        listdir_res = list(os.listdir(feature_dir))
-        for name in sorted(listdir_res):
-            phone = np.load(os.path.join(feature_dir, name))
-            npys.append(phone)
-        big_npy = np.concatenate(npys, 0)
-        np.save(os.path.join(training_dir, "total_fea.npy"), big_npy)
-        n_ivf = big_npy.shape[0] // 39
-        index = faiss.index_factory(256, f"IVF{n_ivf},Flat")
-        index_ivf = faiss.extract_index_ivf(index)
-        index_ivf.nprobe = int(np.power(n_ivf, 0.3))
-        index.train(big_npy)
-        index.add(big_npy)
-        faiss.write_index(
-            index,
-            os.path.join(
-                training_dir, f"added_IVF{n_ivf}_Flat_nprobe_{index_ivf.nprobe}.index"
-            ),
-        )
+        # feature_dir = os.path.join(training_dir, "3_feature256")
+        # npys = []
+        # listdir_res = list(os.listdir(feature_dir))
+        # for name in sorted(listdir_res):
+        #     phone = np.load(os.path.join(feature_dir, name))
+        #     npys.append(phone)
+        # big_npy = np.concatenate(npys, 0)
+        # np.save(os.path.join(training_dir, "total_fea.npy"), big_npy)
+        # n_ivf = big_npy.shape[0] // 39
+        # index = faiss.index_factory(256, f"IVF{n_ivf},Flat")
+        # index_ivf = faiss.extract_index_ivf(index)
+        # index_ivf.nprobe = int(np.power(n_ivf, 0.3))
+        # index.train(big_npy)
+        # index.add(big_npy)
+        # faiss.write_index(
+        #     index,
+        #     os.path.join(
+        #         training_dir, f"added_IVF{n_ivf}_Flat_nprobe_{index_ivf.nprobe}.index"
+        #     ),
+        # )
 
         return "Training completed"
 
