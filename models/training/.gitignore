@@ -1,4 +1,6 @@
 */**
-mute/**/*.pt
+
 !mute/**/*
 !.gitignore
+
+mute/**/*.pt
