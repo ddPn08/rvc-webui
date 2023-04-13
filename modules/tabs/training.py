@@ -1,4 +1,5 @@
 import os
+import shutil
 from multiprocessing import cpu_count
 
 import faiss
@@ -8,7 +9,7 @@ import numpy as np
 from modules import utils
 from modules.shared import MODELS_DIR
 from modules.training.extract import extract_f0, extract_feature
-from modules.training.preprocess import preprocess_trainset
+from modules.training.preprocess import preprocess_dataset
 from modules.training.train import run_training
 
 SR_DICT = {
@@ -37,21 +38,27 @@ def tab():
         save_every_epoch,
         pre_trained_bottom_model_g,
         pre_trained_bottom_model_d,
+        ignore_cache,
     ):
         has_pitch_guidance = has_pitch_guidance == "Yes"
-        training_dir = os.path.join(MODELS_DIR, "training", model_name)
+        training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
         yield f"Training directory: {training_dir}"
 
+        if os.path.exists(training_dir) and ignore_cache:
+            shutil.rmtree(training_dir)
+
+        os.makedirs(training_dir, exist_ok=True)
+
         yield "Preprocessing..."
-        preprocess_trainset(
-            dataset_dir, SR_DICT[target_sr], num_cpu_process, model_name
+        preprocess_dataset(
+            dataset_dir, SR_DICT[target_sr], num_cpu_process, training_dir
         )
 
         yield "Extracting f0..."
-        extract_f0(model_name, num_cpu_process, pitch_extraction_algo)
+        extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
         yield "Extracting features..."
-        extract_feature(model_name)
+        extract_feature(training_dir)
 
         gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
         co256_dir = os.path.join(training_dir, "3_feature256")
@@ -154,6 +161,7 @@ def tab():
             with gr.Column():
                 with gr.Row().style(equal_height=False):
                     model_name = gr.Textbox(label="Model Name")
+                    ignore_cache = gr.Checkbox(label="Ignore cache")
                     target_sr = gr.Radio(
                         choices=["32k", "40k", "48k"],
                         value="40k",
@@ -236,6 +244,7 @@ def tab():
             save_every_epoch,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
+            ignore_cache,
         ],
         outputs=[status],
     )

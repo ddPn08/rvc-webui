@@ -11,7 +11,6 @@ import pyworld
 import soundfile as sf
 import torch
 import torch.nn.functional as F
-import tqdm
 from fairseq import checkpoint_utils
 
 from modules.models import MODELS_DIR
@@ -88,7 +87,7 @@ class FeatureInput(object):
 
     def go(self, paths, f0_method):
         if len(paths) != 0:
-            for idx, (inp_path, opt_path1, opt_path2) in enumerate(tqdm.tqdm(paths)):
+            for idx, (inp_path, opt_path1, opt_path2) in enumerate(paths):
                 try:
                     if (
                         os.path.exists(opt_path1 + ".npy") == True
@@ -111,8 +110,7 @@ class FeatureInput(object):
                     print(f"f0 failed {idx}: {inp_path} {traceback.format_exc()}")
 
 
-def extract_f0(model_name: str, num_processes: int, f0_method: str):
-    training_dir = os.path.join(MODELS_DIR, "training", model_name)
+def extract_f0(training_dir: str, num_processes: int, f0_method: str):
     feature_input = FeatureInput()
     paths = []
     dataset_dir = os.path.join(training_dir, "1_16k_wavs")
@@ -148,9 +146,7 @@ def extract_f0(model_name: str, num_processes: int, f0_method: str):
         p.join()
 
 
-def extract_feature(model_name: str):
-    training_dir = os.path.join(MODELS_DIR, "training", model_name)
-
+def extract_feature(training_dir: str):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
 

@@ -10,6 +10,7 @@ praat-parselmouth==0.4.3
 pyworld==0.3.2
 soundfile==0.12.1
 ffmpeg-python==0.2.0
+pydub==0.25.1
 
 tensorboard
 tensorboardX

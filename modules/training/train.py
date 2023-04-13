@@ -21,6 +21,7 @@ from ..inference.models import (
 )
 from ..models import MODELS_DIR
 from . import utils
+from .checkpoints import save
 from .data_utils import (
     DistributedBucketSampler,
     TextAudioCollate,
@@ -30,7 +31,6 @@ from .data_utils import (
 )
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .process_ckpt import save
 
 
 def run_training(
@@ -46,7 +46,7 @@ def run_training(
     save_only_last: bool = False,
     cache_in_gpu: bool = False,
 ):
-    training_dir = os.path.join(MODELS_DIR, "training", model_name)
+    training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
     hps = utils.get_hparams(
         model_name,
         training_dir,
@@ -682,5 +682,4 @@ def run(
             ckpt = net_g.module.state_dict()
         else:
             ckpt = net_g.state_dict()
-        save_log = save(ckpt, hps.sample_rate, hps.if_f0, hps.name, epoch)
-        print(f"Saving final ckpt: {save_log}")
+        save(ckpt, hps.sample_rate, hps.if_f0, hps.name, epoch)
