@@ -74,17 +74,14 @@ def run_training(
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
 
-    if len(gpus) > 1:
-        mp.spawn(
-            run,
-            nprocs=len(gpus),
-            args=(
-                len(gpus),
-                hps,
-            ),
-        )
-    else:
-        run(0, len(gpus), hps)
+    mp.spawn(
+        run,
+        nprocs=len(gpus),
+        args=(
+            len(gpus),
+            hps,
+        ),
+    )
 
     if PREV_CUDA_VISIBLE_DEVICES is None:
         del os.environ["CUDA_VISIBLE_DEVICES"]
