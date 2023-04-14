@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 
 from modules import models
@@ -29,4 +30,5 @@ def install_ffmpeg():
 
 def preload():
     models.download_models()
-    install_ffmpeg()
+    if sys.platform == "win32":
+        install_ffmpeg()
