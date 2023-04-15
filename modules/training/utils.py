@@ -80,32 +80,6 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
     )
 
 
-def save_checkpoint_d(combd, sbd, optimizer, learning_rate, iteration, checkpoint_path):
-    print(
-        "Saving model and optimizer state at epoch {} to {}".format(
-            iteration, checkpoint_path
-        )
-    )
-    if hasattr(combd, "module"):
-        state_dict_combd = combd.module.state_dict()
-    else:
-        state_dict_combd = combd.state_dict()
-    if hasattr(sbd, "module"):
-        state_dict_sbd = sbd.module.state_dict()
-    else:
-        state_dict_sbd = sbd.state_dict()
-    torch.save(
-        {
-            "combd": state_dict_combd,
-            "sbd": state_dict_sbd,
-            "iteration": iteration,
-            "optimizer": optimizer.state_dict(),
-            "learning_rate": learning_rate,
-        },
-        checkpoint_path,
-    )
-
-
 def summarize(
     writer,
     global_step,

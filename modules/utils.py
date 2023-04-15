@@ -1,3 +1,5 @@
+import socket
+
 import ffmpeg
 import numpy as np
 import requests
@@ -32,3 +34,12 @@ def donwload_file(url, out):
     req = requests.get(url, allow_redirects=True)
     with open(out, "wb") as f:
         f.write(req.content)
+
+
+def find_empty_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    s.close()
+    return port

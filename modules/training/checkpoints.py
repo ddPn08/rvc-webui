@@ -93,5 +93,5 @@ def save(ckpt: Dict[str, torch.Tensor], sr: int, if_f0: int, name: str, epoch: i
         )
     state_dict["info"] = f"{epoch}epoch"
     state_dict["sr"] = sr
-    state_dict["f0"] = if_f0
+    state_dict["f0"] = int(if_f0)
     torch.save(state_dict, os.path.join(MODELS_DIR, "checkpoints", f"{name}.pth"))

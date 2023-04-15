@@ -195,7 +195,7 @@ def tab():
                     )
                 with gr.Row().style(equal_height=False):
                     batch_size = gr.Slider(
-                        minimum=1, maximum=64, value=16, step=1, label="Batch size"
+                        minimum=1, maximum=64, value=4, step=1, label="Batch size"
                     )
                     num_epochs = gr.Slider(
                         minimum=1,

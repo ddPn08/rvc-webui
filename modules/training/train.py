@@ -20,6 +20,7 @@ from ..inference.models import (
     SynthesizerTrnMs256NSFSidNono,
 )
 from ..models import MODELS_DIR
+from ..utils import find_empty_port
 from . import utils
 from .checkpoints import save
 from .data_utils import (
@@ -63,7 +64,7 @@ def run_training(
     )
 
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "5555"
+    os.environ["MASTER_PORT"] = find_empty_port()
 
     deterministic = torch.backends.cudnn.deterministic
     benchmark = torch.backends.cudnn.benchmark
@@ -93,22 +94,22 @@ def run_training(
 
 
 def run(
-    gpu_id: int,
-    n_gpus: List[int],
+    rank: int,
+    world_size: List[int],
     hps: utils.HParams,
 ):
     global_step = 0
-    is_main_process = gpu_id == 0
+    is_main_process = rank == 0
     if is_main_process:
         utils.check_git_hash(hps.model_dir)
         writer = SummaryWriter(log_dir=hps.model_dir)
 
     dist.init_process_group(
-        backend="gloo", init_method="env://", world_size=n_gpus, rank=gpu_id
+        backend="gloo", init_method="env://", rank=rank, world_size=world_size
     )
     torch.manual_seed(hps.train.seed)
     if torch.cuda.is_available():
-        torch.cuda.set_device(gpu_id)
+        torch.cuda.set_device(rank)
 
     if hps.if_f0 == 1:
         train_dataset = TextAudioLoaderMultiNSFsid(hps.data.training_files, hps.data)
@@ -116,11 +117,11 @@ def run(
         train_dataset = TextAudioLoader(hps.data.training_files, hps.data)
     train_sampler = DistributedBucketSampler(
         train_dataset,
-        hps.train.batch_size * n_gpus,
+        hps.train.batch_size * world_size,
         # [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200,1400],  # 16s
         [100, 200, 300, 400, 500, 600, 700, 800, 900],  # 16s
-        num_replicas=n_gpus,
-        rank=gpu_id,
+        num_replicas=world_size,
+        rank=rank,
         shuffle=True,
     )
     # It is possible that dataloader's workers are out of shared memory. Please try to raise your shared memory limit.
@@ -155,10 +156,10 @@ def run(
             is_half=hps.train.fp16_run,
         )
     if torch.cuda.is_available():
-        net_g = net_g.cuda(gpu_id)
+        net_g = net_g.cuda(rank)
     net_d = MultiPeriodDiscriminator(hps.model.use_spectral_norm)
     if torch.cuda.is_available():
-        net_d = net_d.cuda(gpu_id)
+        net_d = net_d.cuda(rank)
     optim_g = torch.optim.AdamW(
         net_g.parameters(),
         hps.train.learning_rate,
@@ -174,8 +175,8 @@ def run(
     # net_g = DDP(net_g, device_ids=[rank], find_unused_parameters=True)
     # net_d = DDP(net_d, device_ids=[rank], find_unused_parameters=True)
     if torch.cuda.is_available():
-        net_g = DDP(net_g, device_ids=[gpu_id])
-        net_d = DDP(net_d, device_ids=[gpu_id])
+        net_g = DDP(net_g, device_ids=[rank])
+        net_d = DDP(net_d, device_ids=[rank])
     else:
         net_g = DDP(net_g)
         net_d = DDP(net_d)
@@ -255,21 +256,22 @@ def run(
                         wave_lengths,
                         sid,
                     ) = info
+
                 if torch.cuda.is_available():
                     phone, phone_lengths = phone.cuda(
-                        gpu_id, non_blocking=True
-                    ), phone_lengths.cuda(gpu_id, non_blocking=True)
+                        rank, non_blocking=True
+                    ), phone_lengths.cuda(rank, non_blocking=True)
                     if hps.if_f0 == 1:
                         pitch, pitchf = pitch.cuda(
-                            gpu_id, non_blocking=True
-                        ), pitchf.cuda(gpu_id, non_blocking=True)
-                    sid = sid.cuda(gpu_id, non_blocking=True)
+                            rank, non_blocking=True
+                        ), pitchf.cuda(rank, non_blocking=True)
+                    sid = sid.cuda(rank, non_blocking=True)
                     spec, spec_lengths = spec.cuda(
-                        gpu_id, non_blocking=True
-                    ), spec_lengths.cuda(gpu_id, non_blocking=True)
+                        rank, non_blocking=True
+                    ), spec_lengths.cuda(rank, non_blocking=True)
                     wave, wave_lengths = wave.cuda(
-                        gpu_id, non_blocking=True
-                    ), wave_lengths.cuda(gpu_id, non_blocking=True)
+                        rank, non_blocking=True
+                    ), wave_lengths.cuda(rank, non_blocking=True)
                 if hps.if_cache_data_in_gpu == True:
                     if hps.if_f0 == 1:
                         cache.append(

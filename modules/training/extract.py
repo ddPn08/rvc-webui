@@ -34,8 +34,8 @@ class FeatureInput(object):
         assert sr == self.fs
         if f0_method == "pm":
             time_step = 160 / 16000 * 1000
-            f0_min = 50
             f0_max = 1100
+            f0_min = 50
             f0 = (
                 parselmouth.Sound(x, sr)
                 .to_pitch_ac(
@@ -55,7 +55,8 @@ class FeatureInput(object):
             f0, t = pyworld.harvest(
                 x.astype(np.double),
                 fs=sr,
-                f0_ceil=1100,
+                f0_ceil=self.f0_max,
+                f0_floor=self.f0_min,
                 frame_period=1000 * self.hop / sr,
             )
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.fs)
@@ -63,7 +64,8 @@ class FeatureInput(object):
             f0, t = pyworld.dio(
                 x.astype(np.double),
                 fs=sr,
-                f0_ceil=1100,
+                f0_ceil=self.f0_max,
+                f0_floor=self.f0_min,
                 frame_period=1000 * self.hop / sr,
             )
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.fs)
@@ -176,7 +178,7 @@ def extract_feature(training_dir: str):
     )
     model = models[0]
     model = model.to(device)
-    if torch.cuda.is_available():
+    if device != "cpu":
         model = model.half()
     model.eval()
 
@@ -196,7 +198,7 @@ def extract_feature(training_dir: str):
                     padding_mask = torch.BoolTensor(feats.shape).fill_(False)
                     inputs = {
                         "source": feats.half().to(device)
-                        if torch.cuda.is_available()
+                        if device != "cpu"
                         else feats.to(device),
                         "padding_mask": padding_mask.to(device),
                         "output_layer": 9,  # layer 9

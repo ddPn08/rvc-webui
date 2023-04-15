@@ -9,25 +9,57 @@ from .cmd_opts import opts
 from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
-from .utils import load_audio, donwload_file
+from .utils import donwload_file, load_audio
+
+
+def update_state_dict(state_dict):
+    if "params" in state_dict:
+        return
+    keys = [
+        "spec_channels",
+        "segment_size",
+        "inter_channels",
+        "hidden_channels",
+        "filter_channels",
+        "n_heads",
+        "n_layers",
+        "kernel_size",
+        "p_dropout",
+        "resblock",
+        "resblock_kernel_sizes",
+        "resblock_dilation_sizes",
+        "upsample_rates",
+        "upsample_initial_channel",
+        "upsample_kernel_sizes",
+        "spk_embed_dim",
+        "gin_channels",
+        "sr",
+    ]
+    for i, key in enumerate(keys):
+        state_dict["params"][key] = state_dict["config"][i]
 
 
 class VC_MODEL:
-    def __init__(self, model_name: str, weight: Dict[str, Any]) -> None:
+    def __init__(self, model_name: str, state_dict: Dict[str, Any]) -> None:
+        update_state_dict(state_dict)
         self.model_name = model_name
-        self.weight = weight
-        self.tgt_sr = weight["config"][-1]
-        f0 = weight.get("f0", 1)
-        weight["config"][-3] = weight["weight"]["emb_g.weight"].shape[0]
+        self.weight = state_dict
+        self.tgt_sr = state_dict["params"]["sr"]
+        f0 = state_dict.get("f0", 1)
+        state_dict["params"]["spk_embed_dim"] = state_dict["weight"][
+            "emb_g.weight"
+        ].shape[0]
 
         if f0 == 1:
-            self.net_g = SynthesizerTrnMs256NSFSid(*weight["config"], is_half=is_half)
+            self.net_g = SynthesizerTrnMs256NSFSid(
+                **state_dict["params"], is_half=is_half
+            )
         else:
-            self.net_g = SynthesizerTrnMs256NSFSidNono(*weight["config"])
+            self.net_g = SynthesizerTrnMs256NSFSidNono(**state_dict["params"])
 
         del self.net_g.enc_q
 
-        self.net_g.load_state_dict(weight["weight"], strict=False)
+        self.net_g.load_state_dict(state_dict["weight"], strict=False)
         self.net_g.eval().to(device)
 
         if is_half:
@@ -36,7 +68,7 @@ class VC_MODEL:
             self.net_g = self.net_g.float()
 
         self.vc = VC(self.tgt_sr, device, is_half)
-        self.n_spk = weight["config"][-3]
+        self.n_spk = state_dict["params"]["spk_embed_dim"]
 
     def single(
         self,

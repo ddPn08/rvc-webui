@@ -69,6 +69,7 @@ def merge(
         else:
             merged["weight"][key] = merge_weight(weight_a[key], weight_b[key], None, a)
     merged["config"] = state_dict["config"]
+    merged["params"] = state_dict["params"] if "params" in state_dict else None
     merged["sr"] = state_dict["sr"]
     merged["f0"] = state_dict["f0"]
     merged["info"] = state_dict["info"]

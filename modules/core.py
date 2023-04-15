@@ -1,10 +1,10 @@
 import os
-import sys
 import shutil
+import sys
 
 from modules import models
-from modules.utils import donwload_file
 from modules.shared import ROOT_DIR
+from modules.utils import donwload_file
 
 
 def install_ffmpeg():

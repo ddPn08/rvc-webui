@@ -70,6 +70,7 @@ class VC(object):
                 x.astype(np.double),
                 fs=self.sr,
                 f0_ceil=f0_max,
+                f0_floor=f0_min,
                 frame_period=10,
             )
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
@@ -175,7 +176,8 @@ class VC(object):
                     .astype(np.int16)
                 )
         del feats, p_len, padding_mask
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         t2 = ttime()
         times[0] += t1 - t0
         times[2] += t2 - t1
@@ -318,5 +320,6 @@ class VC(object):
             )
         audio_opt = np.concatenate(audio_opt)
         del pitch, pitchf, sid
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return audio_opt
