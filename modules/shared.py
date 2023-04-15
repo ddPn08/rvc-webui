@@ -7,7 +7,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 
 
-def has_mps() -> bool:
+def has_mps():
     if sys.platform != "darwin":
         return False
     else:

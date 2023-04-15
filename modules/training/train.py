@@ -1,10 +1,10 @@
 import os
-from random import shuffle
 import time
+from random import shuffle
 from typing import *
-import numpy as np
-import faiss
 
+import faiss
+import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -201,6 +201,7 @@ def run(
         betas=config.train.betas,
         eps=config.train.eps,
     )
+
     if torch.cuda.is_available():
         net_g = DDP(net_g, device_ids=[rank])
         net_d = DDP(net_d, device_ids=[rank])

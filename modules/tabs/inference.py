@@ -19,6 +19,10 @@ def inference_options_ui():
                 value="pm",
                 label="Pitch Extraction Algorithm",
             )
+        with gr.Column():
+            auto_load_index = gr.Checkbox(value=True, label="Auto Load Index")
+            faiss_index_file = gr.Textbox(value="", label="Faiss Index File Path")
+            big_npy_file = gr.Textbox(value="", label="Big NPY File Path")
             retrieval_feature_ratio = gr.Slider(
                 minimum=0,
                 maximum=1,
@@ -33,6 +37,9 @@ def inference_options_ui():
         source_audio,
         transpose,
         pitch_extraction_algo,
+        auto_load_index,
+        faiss_index_file,
+        big_npy_file,
         retrieval_feature_ratio,
         fo_curve_file,
     )
@@ -52,6 +59,9 @@ class Inference(Tab):
             f0_up_key,
             f0_file,
             f0_method,
+            auto_load_index,
+            faiss_index_file,
+            big_npy_file,
             index_rate,
         ):
             model = models.vc_model
@@ -62,6 +72,9 @@ class Inference(Tab):
                     f0_up_key,
                     f0_file,
                     f0_method,
+                    auto_load_index,
+                    faiss_index_file,
+                    big_npy_file,
                     index_rate,
                 )
                 return "Success", (model.tgt_sr, audio)
@@ -77,8 +90,11 @@ class Inference(Tab):
                         source_audio,
                         transpose,
                         pitch_extraction_algo,
+                        auto_load_index,
+                        faiss_index_file,
+                        big_npy_file,
                         retrieval_feature_ratio,
-                        fo_curve_file,
+                        f0_curve_file,
                     ) = inference_options_ui()
 
                     with gr.Row().style(equal_height=False):
@@ -95,8 +111,11 @@ class Inference(Tab):
                 speaker_id,
                 source_audio,
                 transpose,
-                fo_curve_file,
+                f0_curve_file,
                 pitch_extraction_algo,
+                auto_load_index,
+                faiss_index_file,
+                big_npy_file,
                 retrieval_feature_ratio,
             ],
             outputs=[status, output],

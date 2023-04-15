@@ -6,9 +6,9 @@ import gradio as gr
 import torch
 
 from modules import models
-from modules.ui import Tab
 from modules.merge import merge
 from modules.tabs.inference import inference_options_ui
+from modules.ui import Tab
 
 MERGE_METHODS = {
     "weight_sum": "Weight sum:A*(1-alpha)+B*alpha",
@@ -72,6 +72,9 @@ class Merge(Tab):
             transpose,
             fo_curve_file,
             pitch_extraction_algo,
+            auto_load_index,
+            faiss_index_file,
+            big_npy_file,
             retrieval_feature_ratio,
         ):
             merged = merge_ckpt(
@@ -84,6 +87,9 @@ class Merge(Tab):
                 transpose,
                 fo_curve_file,
                 pitch_extraction_algo,
+                auto_load_index,
+                faiss_index_file,
+                big_npy_file,
                 retrieval_feature_ratio,
             )
             tgt_sr = model.tgt_sr
@@ -268,6 +274,9 @@ class Merge(Tab):
                         source_audio,
                         transpose,
                         pitch_extraction_algo,
+                        auto_load_index,
+                        faiss_index_file,
+                        big_npy_file,
                         retrieval_feature_ratio,
                         fo_curve_file,
                     ) = inference_options_ui()
@@ -321,6 +330,9 @@ class Merge(Tab):
                     transpose,
                     fo_curve_file,
                     pitch_extraction_algo,
+                    auto_load_index,
+                    faiss_index_file,
+                    big_npy_file,
                     retrieval_feature_ratio,
                 ]
 

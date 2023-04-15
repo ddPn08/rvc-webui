@@ -1,12 +1,12 @@
-from typing import *
 import importlib
 import os
+from typing import *
 
 import gradio as gr
 import gradio.routes
 import torch
 
-from . import shared, models
+from . import models, shared
 from .core import preload
 from .shared import ROOT_DIR
 

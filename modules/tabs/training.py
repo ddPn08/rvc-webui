@@ -5,11 +5,11 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from modules import utils
-from modules.ui import Tab
 from modules.shared import MODELS_DIR
 from modules.training.extract import extract_f0, extract_feature
 from modules.training.preprocess import preprocess_dataset
 from modules.training.train import run_training
+from modules.ui import Tab
 
 SR_DICT = {
     "32k": 32000,
@@ -149,10 +149,10 @@ class Training(Tab):
                             value="40k",
                             label="Target sampling rate",
                         )
-                        has_pitch_guidance = gr.Radio(
+                        f0 = gr.Radio(
                             choices=["Yes", "No"],
                             value="Yes",
-                            label="Model has pitch guidance",
+                            label="f0 Model",
                         )
 
                     with gr.Row().style(equal_height=False):
@@ -215,7 +215,7 @@ class Training(Tab):
             inputs=[
                 model_name,
                 target_sr,
-                has_pitch_guidance,
+                f0,
                 dataset_dir,
                 speaker_id,
                 gpu_id,

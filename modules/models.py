@@ -78,6 +78,9 @@ class VC_MODEL:
         f0_up_key,
         f0_file,
         f0_method,
+        auto_load_index,
+        faiss_index_file,
+        big_npy_file,
         index_rate,
     ):
         if input_audio is None:
@@ -88,6 +91,12 @@ class VC_MODEL:
         if hubert_model == None:
             load_hubert()
         f0 = self.weight.get("f0", 1)
+
+        if faiss_index_file is None and auto_load_index:
+            faiss_index_file = self.get_index_path()
+        if big_npy_file is None and auto_load_index:
+            big_npy_file = self.get_big_npy_path()
+
         audio_opt = self.vc(
             hubert_model,
             self.net_g,
@@ -96,8 +105,8 @@ class VC_MODEL:
             times,
             f0_up_key,
             f0_method,
-            self.get_index_path(),
-            self.get_big_npy_path(),
+            faiss_index_file,
+            big_npy_file,
             index_rate,
             f0,
             f0_file=f0_file,

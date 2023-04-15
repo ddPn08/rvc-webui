@@ -1,7 +1,7 @@
 import gradio as gr
 
-from modules.ui import Tab
 from modules.separate import separate_audio
+from modules.ui import Tab
 
 
 class Separate(Tab):
