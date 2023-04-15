@@ -88,6 +88,21 @@ def extract_arg(args, name):
     return [x for x in args if x != name], name in args
 
 
+def fix_faiss():
+    spec = importlib.util.find_spec("faiss")
+    if (
+        spec.submodule_search_locations is None
+        or len(spec.submodule_search_locations) == 0
+    ):
+        return
+    dir = spec.submodule_search_locations[0]
+    if os.path.exists(os.path.join(dir, "swigfaiss_avx2.py")):
+        return
+    os.symlink(
+        os.path.join(dir, "swigfaiss.py"), os.path.join(dir, "swigfaiss_avx2.py")
+    )
+
+
 def prepare_environment():
     commit = commit_hash()
 
@@ -127,6 +142,8 @@ def prepare_environment():
         desc=f"Installing requirements",
         errdesc=f"Couldn't install requirements",
     )
+
+    fix_faiss()
 
 
 def start():
