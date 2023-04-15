@@ -98,9 +98,12 @@ def fix_faiss():
     dir = spec.submodule_search_locations[0]
     if os.path.exists(os.path.join(dir, "swigfaiss_avx2.py")):
         return
-    os.symlink(
-        os.path.join(dir, "swigfaiss.py"), os.path.join(dir, "swigfaiss_avx2.py")
-    )
+    try:
+        os.symlink(
+            os.path.join(dir, "swigfaiss.py"), os.path.join(dir, "swigfaiss_avx2.py")
+        )
+    except:
+        pass
 
 
 def prepare_environment():
