@@ -12,13 +12,13 @@ def write_config(state_dict: Dict[str, Any], cfg: Dict[str, Any]):
     state_dict["params"] = cfg
 
 
-def save(ckpt: Dict[str, torch.Tensor], sr: int, if_f0: int, name: str, epoch: int):
+def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, epoch: int):
     state_dict = OrderedDict()
     state_dict["weight"] = {}
-    for key in ckpt.keys():
+    for key in weights.keys():
         if "enc_q" in key:
             continue
-        state_dict["weight"][key] = ckpt[key].half()
+        state_dict["weight"][key] = weights[key].half()
     if sr == "40k":
         write_config(
             state_dict,
@@ -93,5 +93,15 @@ def save(ckpt: Dict[str, torch.Tensor], sr: int, if_f0: int, name: str, epoch: i
         )
     state_dict["info"] = f"{epoch}epoch"
     state_dict["sr"] = sr
-    state_dict["f0"] = int(if_f0)
+    state_dict["f0"] = int(f0)
+    return state_dict
+
+
+def save(model, sr: int, f0: int, name: str, epoch: int):
+    if hasattr(model, "module"):
+        state_dict = model.module.state_dict()
+    else:
+        state_dict = model.state_dict()
+
+    state_dict = create_trained_model(state_dict, sr, f0, epoch)
     torch.save(state_dict, os.path.join(MODELS_DIR, "checkpoints", f"{name}.pth"))

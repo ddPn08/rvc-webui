@@ -473,14 +473,14 @@ def run(
                     os.remove(old_g_path)
                 if os.path.exists(old_d_path):
                     os.remove(old_d_path)
-            utils.save_checkpoint(
+            utils.save_state(
                 net_g,
                 optim_g,
                 config.train.learning_rate,
                 epoch,
                 os.path.join(state_dir, f"G_{epoch}.pth"),
             )
-            utils.save_checkpoint(
+            utils.save_state(
                 net_d,
                 optim_d,
                 config.train.learning_rate,
@@ -501,8 +501,4 @@ def run(
 
     if is_main_process:
         print("Training is done. The program is closed.")
-        if hasattr(net_g, "module"):
-            ckpt = net_g.module.state_dict()
-        else:
-            ckpt = net_g.state_dict()
-        save(ckpt, sample_rate, f0, model_name, epoch)
+        save(net_g, sample_rate, f0, model_name, epoch)

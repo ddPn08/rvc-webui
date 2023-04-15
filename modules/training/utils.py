@@ -1,9 +1,7 @@
 import glob
-import json
 import logging
 import os
 import shutil
-import subprocess
 import sys
 
 import matplotlib
@@ -51,23 +49,18 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
         model.load_state_dict(new_state_dict, strict=False)
     print("Loaded model weights")
 
-    iteration = checkpoint_dict["iteration"]
+    epoch = checkpoint_dict["epoch"]
     learning_rate = checkpoint_dict["learning_rate"]
-    if (
-        optimizer is not None and load_opt == 1
-    ):  ###加载不了，如果是空的的话，重新初始化，可能还会影响lr时间表的更新，因此在train文件最外围catch
-        #   try:
+    if optimizer is not None and load_opt == 1:
         optimizer.load_state_dict(checkpoint_dict["optimizer"])
-    #   except:
-    #     traceback.print_exc()
-    print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, iteration))
-    return model, optimizer, learning_rate, iteration
+    print("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, epoch))
+    return model, optimizer, learning_rate, epoch
 
 
-def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path):
+def save_state(model, optimizer, learning_rate, epoch, checkpoint_path):
     print(
         "Saving model and optimizer state at epoch {} to {}".format(
-            iteration, checkpoint_path
+            epoch, checkpoint_path
         )
     )
     if hasattr(model, "module"):
@@ -77,7 +70,7 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
     torch.save(
         {
             "model": state_dict,
-            "iteration": iteration,
+            "epoch": epoch,
             "optimizer": optimizer.state_dict(),
             "learning_rate": learning_rate,
         },
@@ -166,80 +159,3 @@ def load_config(training_dir: str, sample_rate: int):
     shutil.copyfile(config_path, config_save_path)
 
     return TrainConfig.parse_file(config_save_path)
-
-
-def get_hparams_from_dir(model_dir):
-    config_save_path = os.path.join(model_dir, "config.json")
-    with open(config_save_path, "r") as f:
-        data = f.read()
-    config = json.loads(data)
-
-    hparams = HParams(**config)
-    hparams.model_dir = model_dir
-    return hparams
-
-
-def get_hparams_from_file(config_path):
-    with open(config_path, "r") as f:
-        data = f.read()
-    config = json.loads(data)
-
-    hparams = HParams(**config)
-    return hparams
-
-
-def check_git_hash(model_dir):
-    source_dir = os.path.dirname(os.path.realpath(__file__))
-    if not os.path.exists(os.path.join(source_dir, ".git")):
-        logger.warn(
-            "{} is not a git repository, therefore hash value comparison will be ignored.".format(
-                source_dir
-            )
-        )
-        return
-
-    cur_hash = subprocess.getoutput("git rev-parse HEAD")
-
-    path = os.path.join(model_dir, "githash")
-    if os.path.exists(path):
-        saved_hash = open(path).read()
-        if saved_hash != cur_hash:
-            logger.warn(
-                "git hash values are different. {}(saved) != {}(current)".format(
-                    saved_hash[:8], cur_hash[:8]
-                )
-            )
-    else:
-        open(path, "w").write(cur_hash)
-
-
-class HParams:
-    def __init__(self, **kwargs):
-        for k, v in kwargs.items():
-            if type(v) == dict:
-                v = HParams(**v)
-            self[k] = v
-
-    def keys(self):
-        return self.__dict__.keys()
-
-    def items(self):
-        return self.__dict__.items()
-
-    def values(self):
-        return self.__dict__.values()
-
-    def __len__(self):
-        return len(self.__dict__)
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __setitem__(self, key, value):
-        return setattr(self, key, value)
-
-    def __contains__(self, key):
-        return key in self.__dict__
-
-    def __repr__(self):
-        return self.__dict__.__repr__()
