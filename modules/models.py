@@ -15,6 +15,7 @@ from .utils import donwload_file, load_audio
 def update_state_dict(state_dict):
     if "params" in state_dict:
         return
+    state_dict["params"] = {}
     keys = [
         "spec_channels",
         "segment_size",
