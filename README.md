@@ -7,6 +7,18 @@
 </p>
 </div>
 
+---
+
+<div align="center">
+<p>
+
+[日本語](README-ja.md) | [English](README.md)
+
+</p>
+</div>
+
+<br >
+
 # Launch
 
 ## Windows
