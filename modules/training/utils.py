@@ -2,6 +2,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 
@@ -10,6 +11,10 @@ import matplotlib.pylab as plt
 import numpy as np
 import torch
 from scipy.io.wavfile import read
+
+from modules.shared import ROOT_DIR
+
+from .config import TrainConfig
 
 matplotlib.use("Agg")
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -154,50 +159,13 @@ def load_filepaths_and_text(filename, split="|"):
     return filepaths_and_text
 
 
-def get_hparams(
-    model_name: str,
-    training_dir: str,
-    gpus: int,
-    sample_rate: int,
-    f0: int,
-    batch_size: int,
-    total_epoch: int,
-    save_every_epoch: int,
-    pretrain_g: str,
-    pretrain_d: str,
-    save_only_last: bool = False,
-    cache_in_gpu: bool = False,
-):
-    logs_dir = os.path.join(training_dir, "logs")
+def load_config(training_dir: str, sample_rate: int):
+    config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
+    config_save_path = os.path.join(training_dir, "config.json")
 
-    os.makedirs(logs_dir, exist_ok=True)
+    shutil.copyfile(config_path, config_save_path)
 
-    config_path = os.path.join("configs", f"{sample_rate}.json")
-    config_save_path = os.path.join(logs_dir, "config.json")
-
-    with open(config_path, "r") as f:
-        data = f.read()
-
-    with open(config_save_path, "w") as f:
-        f.write(data)
-
-    config = json.loads(data)
-
-    hparams = HParams(**config)
-    hparams.model_dir = hparams.experiment_dir = training_dir
-    hparams.save_every_epoch = save_every_epoch
-    hparams.name = model_name
-    hparams.total_epoch = total_epoch
-    hparams.pretrainG = pretrain_g
-    hparams.pretrainD = pretrain_d
-    hparams.gpus = gpus
-    hparams.train.batch_size = batch_size
-    hparams.sample_rate = sample_rate
-    hparams.if_f0 = f0
-    hparams.if_latest = save_only_last
-    hparams.if_cache_data_in_gpu = cache_in_gpu
-    hparams.data.training_files = os.path.join(training_dir, "filelist.txt")
-    return hparams
+    return TrainConfig.parse_file(config_save_path)
 
 
 def get_hparams_from_dir(model_dir):
