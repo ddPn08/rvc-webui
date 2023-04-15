@@ -21,7 +21,7 @@ from ..inference.models import (
 from ..utils import find_empty_port
 from . import utils
 from .checkpoints import save
-from .config import TrainConfig, load_config
+from .config import TrainConfig
 from .data_utils import (
     DistributedBucketSampler,
     TextAudioCollate,
@@ -59,7 +59,7 @@ def run_training(
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
 
-    config = load_config(training_dir, sample_rate)
+    config = utils.load_config(training_dir, sample_rate)
 
     mp.spawn(
         run,
