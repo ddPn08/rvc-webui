@@ -77,8 +77,6 @@ class VC_MODEL:
         f0_up_key,
         f0_file,
         f0_method,
-        file_index,
-        file_big_npy,
         index_rate,
     ):
         if input_audio is None:
@@ -97,13 +95,21 @@ class VC_MODEL:
             times,
             f0_up_key,
             f0_method,
-            file_index,
-            file_big_npy,
+            self.get_index_path(),
+            self.get_big_npy_path(),
             index_rate,
             f0,
             f0_file=f0_file,
         )
         return audio_opt
+
+    def get_big_npy_path(self):
+        basename = os.path.splitext(self.model_name)[0]
+        return os.path.join(MODELS_DIR, f"{basename}.big.npy")
+
+    def get_index_path(self):
+        basename = os.path.splitext(self.model_name)[0]
+        return os.path.join(MODELS_DIR, f"{basename}.index")
 
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
@@ -161,8 +167,12 @@ def load_hubert():
     hubert_model.eval()
 
 
-def load_model(model_name: str):
-    global vc_model
+def get_vc_model(model_name: str):
     model_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     weight = torch.load(model_path, map_location="cpu")
-    vc_model = VC_MODEL(model_name, weight)
+    return VC_MODEL(model_name, weight)
+
+
+def load_model(model_name: str):
+    global vc_model
+    vc_model = get_vc_model(model_name)

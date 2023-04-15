@@ -104,4 +104,6 @@ def save(model, sr: int, f0: int, name: str, epoch: int):
         state_dict = model.state_dict()
 
     state_dict = create_trained_model(state_dict, sr, f0, epoch)
-    torch.save(state_dict, os.path.join(MODELS_DIR, "checkpoints", f"{name}.pth"))
+    filepath = os.path.join(MODELS_DIR, "checkpoints", f"{name}.pth")
+    torch.save(state_dict, filepath)
+    return filepath

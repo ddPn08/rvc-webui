@@ -1,6 +1,9 @@
 import os
 from random import shuffle
+import time
 from typing import *
+import numpy as np
+import faiss
 
 import torch
 import torch.distributed as dist
@@ -61,6 +64,8 @@ def run_training(
 
     config = utils.load_config(training_dir, sample_rate)
 
+    start = time.perf_counter()
+
     mp.spawn(
         run,
         nprocs=len(gpus),
@@ -80,6 +85,10 @@ def run_training(
             cache_in_gpu,
         ),
     )
+
+    end = time.perf_counter()
+
+    print(f"Time: {end - start}")
 
     if PREV_CUDA_VISIBLE_DEVICES is None:
         del os.environ["CUDA_VISIBLE_DEVICES"]
@@ -501,4 +510,27 @@ def run(
 
     if is_main_process:
         print("Training is done. The program is closed.")
-        save(net_g, sample_rate, f0, model_name, epoch)
+        checkpoint_path = save(net_g, sample_rate, f0, model_name, epoch)
+
+        feature_256_dir = os.path.join(training_dir, "3_feature256")
+        npys = []
+        for name in os.listdir(feature_256_dir):
+            if name.endswith(".npy"):
+                phone = np.load(f"{feature_256_dir}/{name}")
+                npys.append(phone)
+
+        big_npy = np.concatenate(npys, 0)
+        n_ivf = big_npy.shape[0] // 39
+        index = faiss.index_factory(256, f"IVF{n_ivf},Flat")
+        index_ivf = faiss.extract_index_ivf(index)
+        index_ivf.nprobe = int(np.power(n_ivf, 0.3))
+        index.train(big_npy)
+        index.add(big_npy)
+        np.save(
+            os.path.join(os.path.dirname(checkpoint_path), f"{model_name}.big.npy"),
+            big_npy,
+        )
+        faiss.write_index(
+            index,
+            os.path.join(os.path.dirname(checkpoint_path), f"{model_name}.index"),
+        )
