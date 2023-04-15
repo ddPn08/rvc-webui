@@ -64,7 +64,7 @@ def run_training(
     )
 
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = find_empty_port()
+    os.environ["MASTER_PORT"] = str(find_empty_port())
 
     deterministic = torch.backends.cudnn.deterministic
     benchmark = torch.backends.cudnn.benchmark
