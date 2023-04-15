@@ -121,6 +121,7 @@ def tab():
 
         run_training(
             gpu_id.split(","),
+            training_dir,
             model_name,
             target_sr,
             1 if has_pitch_guidance else 0,

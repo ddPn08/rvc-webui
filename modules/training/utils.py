@@ -100,11 +100,12 @@ def summarize(
 
 
 def latest_checkpoint_path(dir_path, regex="G_*.pth"):
-    f_list = glob.glob(os.path.join(dir_path, regex))
-    f_list.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
-    x = f_list[-1]
-    print(x)
-    return x
+    filelist = glob.glob(os.path.join(dir_path, regex))
+    if len(filelist) == 0:
+        return None
+    filelist.sort(key=lambda f: int("".join(filter(str.isdigit, f))))
+    filepath = filelist[-1]
+    return filepath
 
 
 def plot_spectrogram_to_numpy(spectrogram):

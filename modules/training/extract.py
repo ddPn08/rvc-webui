@@ -29,7 +29,7 @@ class FeatureInput(object):
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
     def compute_f0(self, path, f0_method):
-        x, sr = librosa.load(path, self.fs)
+        x, sr = librosa.load(path, sr=self.fs)
         p_len = x.shape[0] // self.hop
         assert sr == self.fs
         if f0_method == "pm":
