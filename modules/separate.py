@@ -1,9 +1,9 @@
 import os
 from typing import *
 
+import tqdm
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
-from tqdm import tqdm
 
 
 def separate_audio(
@@ -45,7 +45,12 @@ def separate_audio(
 
         output_chunks: List[AudioSegment] = []
 
-        for chunk in tqdm(chunks):
+        so_short = None
+
+        for chunk in tqdm.tqdm(chunks):
+            if so_short is not None:
+                chunk = so_short + chunk
+                so_short = None
             if min is None or len(chunk) > min:
                 if max is not None and len(chunk) > max:
                     sub_chunks = [
@@ -54,17 +59,20 @@ def separate_audio(
                     ]
 
                     if len(sub_chunks[-1]) < min:
-                        if padding:
+                        if padding and len(sub_chunks) > 2:
                             output_chunks.extend(sub_chunks[0:-2])
                             output_chunks.append(sub_chunks[-2] + sub_chunks[-1])
                         else:
-                            output_chunks.append(sub_chunks[0:-1])
-
+                            output_chunks.extend(sub_chunks[0:-1])
                     else:
                         output_chunks.extend(sub_chunks)
                 else:
                     output_chunks.append(chunk)
-
+            else:
+                if so_short is None:
+                    so_short = chunk
+                else:
+                    so_short += chunk
         basename = os.path.splitext(os.path.basename(file))[0]
 
         for i, chunk in enumerate(output_chunks):
