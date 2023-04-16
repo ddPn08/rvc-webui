@@ -3,6 +3,7 @@ import os
 from typing import *
 
 import torch
+from pydub import AudioSegment
 from fairseq import checkpoint_utils
 
 from .cmd_opts import opts
@@ -10,6 +11,9 @@ from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFS
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
 from .utils import donwload_file, load_audio
+
+
+AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
 def update_state_dict(state_dict):
@@ -111,6 +115,19 @@ class VC_MODEL:
             f0,
             f0_file=f0_file,
         )
+
+        audio = AudioSegment(
+            audio_opt,
+            frame_rate=self.tgt_sr,
+            sample_width=2,
+            channels=1,
+        )
+        index = os.listdir(AUDIO_OUT_DIR)
+        os.makedirs(AUDIO_OUT_DIR, exist_ok=True)
+        audio.export(
+            os.path.join(AUDIO_OUT_DIR, f"{len(index)+1}-output.wav"), format="wav"
+        )
+
         return audio_opt
 
     def get_big_npy_path(self):

@@ -8,5 +8,8 @@ parser.add_argument("--share", help="Enable gradio share", action="store_true")
 parser.add_argument(
     "--models-dir", help="Path to models directory", type=str, default=None
 )
+parser.add_argument(
+    "--output-dir", help="Path to output directory", type=str, default=None
+)
 
 opts, _ = parser.parse_known_args()
