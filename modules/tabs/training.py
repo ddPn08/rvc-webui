@@ -34,7 +34,7 @@ class Training(Tab):
         def train_index_only(
             model_name,
             target_sr,
-            dataset_dir,
+            dataset_glob,
             num_cpu_process,
             pitch_extraction_algo,
             ignore_cache,
@@ -47,7 +47,7 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
-            datasets = glob_dataset(dataset_glob, SR_DICT[target_sr])
+            datasets = glob_dataset(dataset_glob)
 
             yield "Preprocessing..."
             preprocess_dataset(
