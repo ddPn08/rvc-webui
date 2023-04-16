@@ -580,7 +580,7 @@ def training_runner(
                         scalars=scalar_dict,
                     )
             global_step += 1
-        if epoch % save_every_epoch == 0 and is_main_process:
+        if is_main_process and save_every_epoch != 0 and epoch % save_every_epoch == 0:
             if save_only_last:
                 old_g_path = os.path.join(
                     state_dir, f"G_{epoch - save_every_epoch}.pth"

@@ -185,7 +185,7 @@ class Training(Tab):
                             label="Number of epochs",
                         )
                         save_every_epoch = gr.Slider(
-                            minimum=1,
+                            minimum=0,
                             maximum=1000,
                             value=10,
                             step=1,
