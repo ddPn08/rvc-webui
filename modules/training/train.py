@@ -40,6 +40,8 @@ from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 
 
 def glob_dataset(glob_str: str):
+    if os.path.isdir(glob_str):
+        glob_str = os.path.join(glob_str, "*.wav")
     return sorted(glob.glob(glob_str, recursive=True))
 
 
