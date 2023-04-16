@@ -20,7 +20,7 @@ def inference_options_ui():
                 label="Pitch Extraction Algorithm",
             )
         with gr.Column():
-            auto_load_index = gr.Checkbox(value=True, label="Auto Load Index")
+            auto_load_index = gr.Checkbox(value=False, label="Auto Load Index")
             faiss_index_file = gr.Textbox(value="", label="Faiss Index File Path")
             big_npy_file = gr.Textbox(value="", label="Big NPY File Path")
             retrieval_feature_ratio = gr.Slider(
