@@ -92,9 +92,9 @@ class VC_MODEL:
             load_hubert()
         f0 = self.weight.get("f0", 1)
 
-        if faiss_index_file is None and auto_load_index:
+        if not faiss_index_file and auto_load_index:
             faiss_index_file = self.get_index_path()
-        if big_npy_file is None and auto_load_index:
+        if not big_npy_file and auto_load_index:
             big_npy_file = self.get_big_npy_path()
 
         audio_opt = self.vc(
@@ -115,11 +115,11 @@ class VC_MODEL:
 
     def get_big_npy_path(self):
         basename = os.path.splitext(self.model_name)[0]
-        return os.path.join(MODELS_DIR, f"{basename}.big.npy")
+        return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.big.npy")
 
     def get_index_path(self):
         basename = os.path.splitext(self.model_name)[0]
-        return os.path.join(MODELS_DIR, f"{basename}.index")
+        return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.index")
 
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
