@@ -88,42 +88,42 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool, speaker_id: int):
                 "speaker_id": speaker_id,
             }
 
-    if f0:
-        mute_gt_wav = os.path.join(
-            MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
-        )
-        mute_co256 = os.path.join(
-            MODELS_DIR, "training", "mute", "3_feature256", "mute.npy"
-        )
-        mute_f0 = os.path.join(MODELS_DIR, "training", "mute", "2a_f0", f"mute.wav.npy")
-        mute_f0nsf = os.path.join(
-            MODELS_DIR, "training", "mute", "2b_f0nsf", f"mute.wav.npy"
-        )
-        meta["mute"] = {
-            "gt_wav": mute_gt_wav,
-            "co256": mute_co256,
-            "f0": mute_f0,
-            "f0nsf": mute_f0nsf,
-            "speaker_id": speaker_id,
-        }
-    else:
-        mute_gt_wav = os.path.join(
-            MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
-        )
-        mute_co256 = os.path.join(
-            MODELS_DIR, "training", "mute", "3_feature256", "mute.npy"
-        )
-        meta["mute"] = {
-            "gt_wav": mute_gt_wav,
-            "co256": mute_co256,
-            "speaker_id": speaker_id,
-        }
+    # if f0:
+    #     mute_gt_wav = os.path.join(
+    #         MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
+    #     )
+    #     mute_co256 = os.path.join(
+    #         co256_dir, "mute.npy"
+    #     )
+    #     mute_f0 = os.path.join(MODELS_DIR, "training", "mute", "2a_f0", f"mute.wav.npy")
+    #     mute_f0nsf = os.path.join(
+    #         MODELS_DIR, "training", "mute", "2b_f0nsf", f"mute.wav.npy"
+    #     )
+    #     meta["mute"] = {
+    #         "gt_wav": mute_gt_wav,
+    #         "co256": mute_co256,
+    #         "f0": mute_f0,
+    #         "f0nsf": mute_f0nsf,
+    #         "speaker_id": speaker_id,
+    #     }
+    # else:
+    #     mute_gt_wav = os.path.join(
+    #         MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
+    #     )
+    #     mute_co256 = os.path.join(
+    #         co256_dir, "mute.npy"
+    #     )
+    #     meta["mute"] = {
+    #         "gt_wav": mute_gt_wav,
+    #         "co256": mute_co256,
+    #         "speaker_id": speaker_id,
+    #     }
 
     with open(os.path.join(training_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
 
 
-def train_index(training_dir: str, model_name: str):
+def train_index(training_dir: str, model_name: str, emb_ch: int):
     checkpoint_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
     npys = []
@@ -134,7 +134,7 @@ def train_index(training_dir: str, model_name: str):
 
     big_npy = np.concatenate(npys, 0)
     n_ivf = big_npy.shape[0] // 39
-    index = faiss.index_factory(256, f"IVF{n_ivf},Flat")
+    index = faiss.index_factory(emb_ch, f"IVF{n_ivf},Flat")
     index_ivf = faiss.extract_index_ivf(index)
     index_ivf.nprobe = int(np.power(n_ivf, 0.3))
     index.train(big_npy)
@@ -161,6 +161,7 @@ def train_model(
     save_every_epoch: int,
     pretrain_g: str,
     pretrain_d: str,
+    embedder_name: str,
     save_only_last: bool = False,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
@@ -174,8 +175,8 @@ def train_model(
     torch.backends.cudnn.benchmark = False
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
-
-    config = utils.load_config(training_dir, sample_rate)
+    
+    config = utils.load_config(training_dir, sample_rate, 768 if embedder_name.endswith("768") else 256)
 
     start = time.perf_counter()
 
@@ -195,6 +196,7 @@ def train_model(
             save_every_epoch,
             pretrain_g,
             pretrain_d,
+            embedder_name,
             save_only_last,
         ),
     )
@@ -226,6 +228,7 @@ def training_runner(
     save_every_epoch: int,
     pretrain_g: str,
     pretrain_d: str,
+    embedder_name: str,
     save_only_last: bool = False,
 ):
     config.train.batch_size = batch_size
@@ -233,6 +236,7 @@ def training_runner(
     state_dir = os.path.join(training_dir, "state")
     training_files_path = os.path.join(training_dir, "meta.json")
     training_meta = DatasetMetadata.parse_file(training_files_path)
+    embedder_out_channels = config.model.emb_channels
 
     global_step = 0
     is_main_process = rank == 0
@@ -329,9 +333,25 @@ def training_runner(
     if last_d_state is None or last_g_state is None:
         epoch = 1
         global_step = 0
+        net_g_state = torch.load(pretrain_g, map_location="cpu")["model"]
+        emb_phone_size = (config.model.hidden_channels, config.model.emb_channels)
+        if emb_phone_size != net_g_state["enc_p.emb_phone.weight"].size():
+            # interpolate
+            orig_shape = net_g_state["enc_p.emb_phone.weight"].size()
+            if net_g_state["enc_p.emb_phone.weight"].dtype == torch.half:
+                net_g_state["enc_p.emb_phone.weight"] = F.interpolate(net_g_state["enc_p.emb_phone.weight"].float().unsqueeze(0).unsqueeze(0), size=emb_phone_size, mode="bilinear").half().squeeze(0).squeeze(0)
+            else:
+                net_g_state["enc_p.emb_phone.weight"] = F.interpolate(net_g_state["enc_p.emb_phone.weight"].unsqueeze(0).unsqueeze(0), size=emb_phone_size, mode="bilinear").squeeze(0).squeeze(0)
+            print(
+                "interpolated pretrained state enc_p.emb_phone from",
+                orig_shape,
+                "to",
+                emb_phone_size,
+            )
         net_g.module.load_state_dict(
-            torch.load(pretrain_g, map_location="cpu")["model"]
+            net_g_state
         )
+        del net_g_state
         net_d.module.load_state_dict(
             torch.load(pretrain_d, map_location="cpu")["model"]
         )
@@ -613,6 +633,8 @@ def training_runner(
                 net_g,
                 sample_rate,
                 f0,
+                embedder_name,
+                embedder_out_channels,
                 os.path.join(training_dir, "checkpoints", f"{model_name}-{epoch}.pth"),
                 epoch,
             )
@@ -635,6 +657,8 @@ def training_runner(
             net_g,
             sample_rate,
             f0,
+            embedder_name,
+            embedder_out_channels,
             os.path.join(MODELS_DIR, "checkpoints", f"{model_name}.pth"),
             epoch,
         )

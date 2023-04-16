@@ -37,6 +37,7 @@ class Training(Tab):
             dataset_glob,
             num_cpu_process,
             pitch_extraction_algo,
+            embedder_name,
             ignore_cache,
         ):
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
@@ -58,12 +59,12 @@ class Training(Tab):
             extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir)
+            extract_feature(training_dir, embedder_name)
 
             yield "Training index..."
-            train_index(training_dir, model_name)
+            train_index(training_dir, model_name, 256 if not embedder_name.endswith("768") else 768)
 
-            return "Training complete"
+            yield "Training complete"
 
         def train_all(
             model_name,
@@ -80,6 +81,7 @@ class Training(Tab):
             save_every_epoch,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
+            embedder_name,
             ignore_cache,
         ):
             f0 = f0 == "Yes"
@@ -103,11 +105,13 @@ class Training(Tab):
                 extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir)
+            extract_feature(training_dir, embedder_name)
 
             create_dataset_meta(training_dir, target_sr, f0, speaker_id)
 
             yield "Training model..."
+            
+            print(f"train_all: emb_name: {embedder_name}")
 
             train_model(
                 gpu_id.split(","),
@@ -121,6 +125,7 @@ class Training(Tab):
                 save_every_epoch,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
+                embedder_name,
             )
 
             yield "Training index..."
@@ -128,9 +133,10 @@ class Training(Tab):
             train_index(
                 training_dir,
                 model_name,
+                256 if not embedder_name.endswith("768") else 768,
             )
 
-            return "Training completed"
+            yield "Training completed"
 
         with gr.Group():
             with gr.Box():
@@ -155,6 +161,11 @@ class Training(Tab):
                         )
                         speaker_id = gr.Slider(
                             maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
+                        )
+                        embedder_name = gr.Radio(
+                            choices=["hubert_base", "contentvec", "hubert_base768", "contentvec768"],
+                            value="hubert_base",
+                            label="Using phone embedder",
                         )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
@@ -216,6 +227,7 @@ class Training(Tab):
                 dataset_glob,
                 num_cpu_process,
                 pitch_extraction_algo,
+                embedder_name,
                 ignore_cache,
             ],
             outputs=[status],
@@ -238,6 +250,7 @@ class Training(Tab):
                 save_every_epoch,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
+                embedder_name,
                 ignore_cache,
             ],
             outputs=[status],

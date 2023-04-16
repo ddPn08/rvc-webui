@@ -7,9 +7,17 @@ import numpy as np
 import tqdm
 from scipy.io import wavfile
 
+from modules.models import MODELS_DIR
 from modules.utils import load_audio
 
 from .slicer import Slicer
+
+
+SR_K_DICT = {
+    32000: "32k",
+    40000: "40k",
+    48000: "48k",
+}
 
 
 class PreProcess:
@@ -44,6 +52,20 @@ class PreProcess:
         tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{idx0}_{idx1}.wav"),
+            16000,
+            (tmp_audio * 32768).astype(np.int16),
+        )
+        
+    def write_mute(self, mute_wave_filename):
+        tmp_audio = load_audio(mute_wave_filename, self.sr)
+        wavfile.write(
+            os.path.join(self.gt_wavs_dir, "mute.wav"),
+            self.sr,
+            (tmp_audio * 32768).astype(np.int16),
+        )
+        tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)
+        wavfile.write(
+            os.path.join(self.wavs16k_dir, "mute.wav"),
             16000,
             (tmp_audio * 32768).astype(np.int16),
         )
@@ -93,3 +115,7 @@ def preprocess_dataset(
     if os.path.exists(pp.gt_wavs_dir) and os.path.exists(pp.wavs16k_dir):
         return
     pp.pipeline_mapping(datasets, num_processes)
+    
+    # process mute file
+    mute_wav = os.path.join(MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{SR_K_DICT[sampling_rate]}.wav")
+    pp.write_mute(mute_wav)

@@ -47,6 +47,7 @@ class TrainConfigModel(BaseModel):
     upsample_kernel_sizes: List[int]
     use_spectral_norm: bool
     gin_channels: int
+    emb_channels: int
     spk_embed_dim: int
 
 
@@ -66,4 +67,4 @@ class DatasetMetaItem(BaseModel):
 
 class DatasetMetadata(BaseModel):
     files: Dict[str, DatasetMetaItem]
-    mute: DatasetMetaItem
+    # mute: DatasetMetaItem

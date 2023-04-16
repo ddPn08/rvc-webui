@@ -2,6 +2,9 @@ import asyncio
 import os
 from typing import *
 
+import posixpath
+from urllib.parse import urlparse
+
 import torch
 from pydub import AudioSegment
 from fairseq import checkpoint_utils
@@ -38,6 +41,7 @@ def update_state_dict(state_dict):
         "upsample_kernel_sizes",
         "spk_embed_dim",
         "gin_channels",
+        "emb_channels",
         "sr",
     ]
     for i, key in enumerate(keys):
@@ -51,9 +55,12 @@ class VC_MODEL:
         self.weight = state_dict
         self.tgt_sr = state_dict["params"]["sr"]
         f0 = state_dict.get("f0", 1)
+        self.embedder_name = state_dict.get("embedder_name", "hubert_base")
         state_dict["params"]["spk_embed_dim"] = state_dict["weight"][
             "emb_g.weight"
         ].shape[0]
+        if not "emb_channels" in state_dict["params"]:
+            state_dict["params"]["emb_channels"] = 256  # for backward compat.
 
         if f0 == 1:
             self.net_g = SynthesizerTrnMs256NSFSid(
@@ -88,12 +95,21 @@ class VC_MODEL:
         index_rate,
     ):
         if input_audio is None:
-            return "You need to upload an audio", None
+            raise Exception("You need to upload an audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
         times = [0, 0, 0]
-        if hubert_model == None:
-            load_hubert()
+        if embedder_model == None or loaded_embedder_model != self.embedder_name:
+            load_emb_dic = {
+                "hubert_base": ("hubert_base.pt", "hubert_base"),
+                "hubert_base768": ("hubert_base.pt", "hubert_base"),
+                "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
+                "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
+            }
+            if not self.embedder_name in load_emb_dic.keys():
+                raise Exception(f"Not supported embedder: {self.embedder_name}")
+            print(f"load {self.embedder_name} embedder")
+            load_embedder(load_emb_dic[self.embedder_name][0], load_emb_dic[self.embedder_name][1])
         f0 = self.weight.get("f0", 1)
 
         if not faiss_index_file and auto_load_index:
@@ -102,7 +118,7 @@ class VC_MODEL:
             big_npy_file = self.get_big_npy_path()
 
         audio_opt = self.vc(
-            hubert_model,
+            embedder_model,
             self.net_g,
             sid,
             audio,
@@ -114,6 +130,7 @@ class VC_MODEL:
             index_rate,
             f0,
             f0_file=f0_file,
+            embedder_name=self.embedder_name,
         )
 
         audio = AudioSegment(
@@ -141,7 +158,8 @@ class VC_MODEL:
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
 vc_model: Optional[VC_MODEL] = None
-hubert_model = None
+embedder_model = None
+loaded_embedder_model = ""
 
 
 def download_models():
@@ -162,11 +180,14 @@ def download_models():
 
     if len(tasks) > 0:
         loop.run_until_complete(asyncio.gather(*tasks))
-
-    url = "https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/hubert_base.pt"
-    out = os.path.join(MODELS_DIR, "hubert_base.pt")
-    if not os.path.exists(out):
-        donwload_file(url, out)
+        
+    for url in [
+        "https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/hubert_base.pt",
+        "https://huggingface.co/innnky/contentvec/resolve/main/checkpoint_best_legacy_500.pt",
+    ]:
+        out = os.path.join(MODELS_DIR, posixpath.basename(urlparse(url).path))
+        if not os.path.exists(out):
+            donwload_file(url, out)
 
 
 def get_models():
@@ -179,19 +200,55 @@ def get_models():
     ]
 
 
+def load_embedder(emb_file, emb_name):
+    global embedder_model, loaded_embedder_model
+    models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
+        [os.path.join(MODELS_DIR, emb_file)],
+        suffix="",
+    )
+    embedder_model = models[0]
+    embedder_model = embedder_model.to(device)
+    if is_half:
+        embedder_model = embedder_model.half()
+    else:
+        embedder_model = embedder_model.float()
+    embedder_model.eval()
+    
+    loaded_embedder_model = emb_name
+
+
 def load_hubert():
-    global hubert_model
+    global embedder_model, loaded_embedder_model
     models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
         [os.path.join(MODELS_DIR, "hubert_base.pt")],
         suffix="",
     )
-    hubert_model = models[0]
-    hubert_model = hubert_model.to(device)
+    embedder_model = models[0]
+    embedder_model = embedder_model.to(device)
     if is_half:
-        hubert_model = hubert_model.half()
+        embedder_model = embedder_model.half()
     else:
-        hubert_model = hubert_model.float()
-    hubert_model.eval()
+        embedder_model = embedder_model.float()
+    embedder_model.eval()
+    
+    loaded_embedder_model = "hubert_base"
+    
+
+def load_contentvec():
+    global embedder_model, loaded_embedder_model
+    models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
+        [os.path.join(MODELS_DIR, "checkpoint_best_legacy_500.pt")],
+        suffix="",
+    )
+    embedder_model = models[0]
+    embedder_model = embedder_model.to(device)
+    if is_half:
+        embedder_model = embedder_model.half()
+    else:
+        embedder_model = embedder_model.float()
+    embedder_model.eval()
+    
+    loaded_embedder_model = "contentvec"
 
 
 def get_vc_model(model_name: str):
