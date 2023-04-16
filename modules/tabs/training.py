@@ -36,6 +36,7 @@ class Training(Tab):
             num_cpu_process,
             pitch_extraction_algo,
             batch_size,
+            cache_batch,
             num_epochs,
             save_every_epoch,
             pre_trained_bottom_model_g,
@@ -130,6 +131,7 @@ class Training(Tab):
                 target_sr,
                 1 if has_pitch_guidance else 0,
                 batch_size,
+                cache_batch,
                 num_epochs,
                 save_every_epoch,
                 pre_trained_bottom_model_g,
@@ -195,6 +197,7 @@ class Training(Tab):
                             step=1,
                             label="Save every epoch",
                         )
+                        cache_batch = gr.Checkbox(label="Cache batch", value=True)
                     with gr.Row().style(equal_height=False):
                         pre_trained_bottom_model_g = gr.Textbox(
                             label="Pre-trained bottom model G path",
@@ -222,6 +225,7 @@ class Training(Tab):
                 num_cpu_process,
                 pitch_extraction_algo,
                 batch_size,
+                cache_batch,
                 num_epochs,
                 save_every_epoch,
                 pre_trained_bottom_model_g,

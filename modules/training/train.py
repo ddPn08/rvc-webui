@@ -43,12 +43,12 @@ def run_training(
     sample_rate: int,
     f0: int,
     batch_size: int,
+    cache_batch: bool,
     total_epoch: int,
     save_every_epoch: int,
     pretrain_g: str,
     pretrain_d: str,
     save_only_last: bool = False,
-    cache_in_gpu: bool = True,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(find_empty_port())
@@ -77,12 +77,12 @@ def run_training(
             sample_rate,
             f0,
             batch_size,
+            cache_batch,
             total_epoch,
             save_every_epoch,
             pretrain_g,
             pretrain_d,
             save_only_last,
-            cache_in_gpu,
         ),
     )
 
@@ -108,12 +108,12 @@ def run(
     sample_rate: int,
     f0: int,
     batch_size: int,
+    cache_in_gpu: bool,
     total_epoch: int,
     save_every_epoch: int,
     pretrain_g: str,
     pretrain_d: str,
     save_only_last: bool = False,
-    cache_in_gpu: bool = True,
 ):
     config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
@@ -228,6 +228,8 @@ def run(
         _, _, _, epoch = utils.load_checkpoint(last_g_state, net_g, optim_g)
         if is_main_process:
             print(f"loaded last state {last_d_state} {last_g_state}")
+
+        epoch += 1
         global_step = (epoch - 1) * len(train_loader)
 
     scheduler_g = torch.optim.lr_scheduler.ExponentialLR(
@@ -250,6 +252,9 @@ def run(
 
         use_cache = len(cache) == len(train_loader)
         data = cache if use_cache else enumerate(train_loader)
+
+        if is_main_process:
+            lr = optim_g.param_groups[0]["lr"]
 
         if use_cache:
             shuffle(cache)
@@ -295,7 +300,7 @@ def run(
                     wave, wave_lengths = wave.cuda(
                         rank, non_blocking=True
                     ), wave_lengths.cuda(rank, non_blocking=True)
-                if cache_in_gpu == True:
+                if cache_in_gpu:
                     if f0 == 1:
                         cache.append(
                             (
@@ -409,20 +414,12 @@ def run(
             if is_main_process:
                 if global_step % config.train.log_interval == 0:
                     lr = optim_g.param_groups[0]["lr"]
-                    print(
-                        "Train Epoch: {} [{:.0f}%]".format(
-                            epoch, 100.0 * batch_idx / len(train_loader)
-                        )
-                    )
                     # Amor For Tensorboard display
                     if loss_mel > 50:
                         loss_mel = 50
                     if loss_kl > 5:
                         loss_kl = 5
 
-                    print(
-                        f"loss_disc={loss_disc:.3f}, loss_gen={loss_gen:.3f}, loss_fm={loss_fm:.3f},loss_mel={loss_mel:.3f}, loss_kl={loss_kl:.3f}"
-                    )
                     scalar_dict = {
                         "loss/g/total": loss_gen_all,
                         "loss/d/total": loss_disc,
@@ -504,6 +501,7 @@ def run(
                 loss_g=float(loss_gen_all),
                 loss_d=float(loss_disc),
                 lr=float(lr),
+                use_cache=use_cache,
             )
 
         scheduler_g.step()
