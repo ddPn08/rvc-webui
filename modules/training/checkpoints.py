@@ -4,8 +4,6 @@ from typing import *
 
 import torch
 
-from modules.models import MODELS_DIR
-
 
 def write_config(state_dict: Dict[str, Any], cfg: Dict[str, Any]):
     state_dict["config"] = [x for x in cfg.values()]
