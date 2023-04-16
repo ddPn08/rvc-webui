@@ -8,7 +8,12 @@ from modules import utils
 from modules.shared import MODELS_DIR
 from modules.training.extract import extract_f0, extract_feature
 from modules.training.preprocess import preprocess_dataset
-from modules.training.train import run_training
+from modules.training.train import (
+    create_dataset_meta,
+    glob_dataset,
+    train_index,
+    train_model,
+)
 from modules.ui import Tab
 
 SR_DICT = {
@@ -26,11 +31,45 @@ class Training(Tab):
         return 2
 
     def ui(self, outlet):
-        def train(
+        def train_index_only(
             model_name,
             target_sr,
-            has_pitch_guidance,
             dataset_dir,
+            num_cpu_process,
+            pitch_extraction_algo,
+            ignore_cache,
+        ):
+            training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
+            yield f"Training directory: {training_dir}"
+
+            if os.path.exists(training_dir) and ignore_cache:
+                shutil.rmtree(training_dir)
+
+            os.makedirs(training_dir, exist_ok=True)
+
+            datasets = glob_dataset(dataset_glob, SR_DICT[target_sr])
+
+            yield "Preprocessing..."
+            preprocess_dataset(
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
+            )
+
+            yield "Extracting f0..."
+            extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+
+            yield "Extracting features..."
+            extract_feature(training_dir)
+
+            yield "Training index..."
+            train_index(training_dir, model_name)
+
+            return "Training complete"
+
+        def train_all(
+            model_name,
+            target_sr,
+            f0,
+            dataset_glob,
             speaker_id,
             gpu_id,
             num_cpu_process,
@@ -43,7 +82,7 @@ class Training(Tab):
             pre_trained_bottom_model_d,
             ignore_cache,
         ):
-            has_pitch_guidance = has_pitch_guidance == "Yes"
+            f0 = f0 == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             yield f"Training directory: {training_dir}"
 
@@ -52,90 +91,43 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
+            datasets = glob_dataset(dataset_glob)
+
             yield "Preprocessing..."
             preprocess_dataset(
-                dataset_dir, SR_DICT[target_sr], num_cpu_process, training_dir
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
             )
 
-            yield "Extracting f0..."
-            extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+            if f0:
+                yield "Extracting f0..."
+                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
             extract_feature(training_dir)
 
-            gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
-            co256_dir = os.path.join(training_dir, "3_feature256")
+            create_dataset_meta(training_dir, target_sr, f0, speaker_id)
 
-            names = set([name.split(".")[0] for name in os.listdir(gt_wavs_dir)]) & set(
-                [name.split(".")[0] for name in os.listdir(co256_dir)]
-            )
+            yield "Training model..."
 
-            if has_pitch_guidance:
-                f0_dir = os.path.join(training_dir, "2a_f0")
-                f0nsf_dir = os.path.join(training_dir, "2b_f0nsf")
-                names = (
-                    names
-                    & set([name.split(".")[0] for name in os.listdir(f0_dir)])
-                    & set([name.split(".")[0] for name in os.listdir(f0nsf_dir)])
-                )
-
-            opt = []
-
-            for name in names:
-                if has_pitch_guidance:
-                    gt_wav_path = os.path.join(gt_wavs_dir, f"{name}.wav")
-                    co256_path = os.path.join(co256_dir, f"{name}.npy")
-                    f0_path = os.path.join(f0_dir, f"{name}.wav.npy")
-                    f0nsf_path = os.path.join(f0nsf_dir, f"{name}.wav.npy")
-                    opt.append(
-                        f"{gt_wav_path}|{co256_path}|{f0_path}|{f0nsf_path}|{speaker_id}"
-                    )
-                else:
-                    gt_wav_path = os.path.join(gt_wavs_dir, f"{name}.wav")
-                    co256_path = os.path.join(co256_dir, f"{name}.npy")
-                    opt.append(f"{gt_wav_path}|{co256_path}|{speaker_id}")
-
-            if has_pitch_guidance:
-                mute_gt_wav = os.path.join(
-                    MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{target_sr}.wav"
-                )
-                mute_co256 = os.path.join(
-                    MODELS_DIR, "training", "mute", "3_feature256", "mute.npy"
-                )
-                mute_f0 = os.path.join(
-                    MODELS_DIR, "training", "mute", "2a_f0", f"mute.wav.npy"
-                )
-                mute_f0nsf = os.path.join(
-                    MODELS_DIR, "training", "mute", "2b_f0nsf", f"mute.wav.npy"
-                )
-                opt.append(
-                    f"{mute_gt_wav}|{mute_co256}|{mute_f0}|{mute_f0nsf}|{speaker_id}"
-                )
-            else:
-                mute_gt_wav = os.path.join(
-                    MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{target_sr}.wav"
-                )
-                mute_co256 = os.path.join(
-                    MODELS_DIR, "training", "mute", "3_feature256", "mute.npy"
-                )
-                opt.append(f"{mute_gt_wav}|{mute_co256}|{speaker_id}")
-            with open(os.path.join(training_dir, "filelist.txt"), "w") as f:
-                f.write("\n".join(opt))
-
-            yield "Training..."
-
-            run_training(
+            train_model(
                 gpu_id.split(","),
                 training_dir,
                 model_name,
                 target_sr,
-                1 if has_pitch_guidance else 0,
+                1 if f0 else 0,
                 batch_size,
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
+            )
+
+            yield "Training index..."
+
+            train_index(
+                training_dir,
+                model_name,
             )
 
             return "Training completed"
@@ -158,7 +150,9 @@ class Training(Tab):
                         )
 
                     with gr.Row().style(equal_height=False):
-                        dataset_dir = gr.Textbox(label="Dataset directory")
+                        dataset_glob = gr.Textbox(
+                            label="Dataset glob", placeholder="data/**/*.wav"
+                        )
                         speaker_id = gr.Slider(
                             maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
                         )
@@ -211,15 +205,29 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         status = gr.Textbox(value="", label="Status")
                     with gr.Row().style(equal_height=False):
-                        train_button = gr.Button("Train", variant="primary")
+                        train_index_button = gr.Button("Train Index", variant="primary")
+                        train_all_button = gr.Button("Train", variant="primary")
 
-        train_button.click(
-            train,
+        train_index_button.click(
+            train_index_only,
+            inputs=[
+                model_name,
+                target_sr,
+                dataset_glob,
+                num_cpu_process,
+                pitch_extraction_algo,
+                ignore_cache,
+            ],
+            outputs=[status],
+        )
+
+        train_all_button.click(
+            train_all,
             inputs=[
                 model_name,
                 target_sr,
                 f0,
-                dataset_dir,
+                dataset_glob,
                 speaker_id,
                 gpu_id,
                 num_cpu_process,

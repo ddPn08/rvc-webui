@@ -1,3 +1,4 @@
+from typing import *
 import os
 import traceback
 
@@ -65,32 +66,25 @@ class PreProcess:
                         break
                 self.norm_write(tmp_audio, index, idx1)
         except:
-            print(f"{path}->{traceback.format_exc()}")
+            traceback.print_exc()
 
-    def pipeline_mapping(self, dataset_dir: str, num_processes: int):
+    def pipeline_mapping(self, datasets: List[str], num_processes: int):
         os.makedirs(self.gt_wavs_dir, exist_ok=True)
         os.makedirs(self.wavs16k_dir, exist_ok=True)
-        try:
-            infos = [
-                (os.path.join(dataset_dir, name), index)
-                for index, name in enumerate(sorted(list(os.listdir(dataset_dir))))
-            ]
-            for path, index in tqdm.tqdm(infos):
-                self.pipeline(path, index)
+        for index, path in enumerate(tqdm.tqdm(sorted(datasets))):
+            self.pipeline(path, index)
 
-            # def task(infos):
-            #     for path, index in tqdm.tqdm(infos):
-            #         self.pipeline(path, index)
+        # def task(infos):
+        #     for path, index in tqdm.tqdm(infos):
+        #         self.pipeline(path, index)
 
-            # with ProcessPoolExecutor() as executor:
-            #     for i in range(num_processes):
-            #         executor.submit(task, infos[i::num_processes])
-        except:
-            print(f"Failed {dataset_dir}->{traceback.format_exc()}")
+        # with ProcessPoolExecutor() as executor:
+        #     for i in range(num_processes):
+        #         executor.submit(task, infos[i::num_processes])
 
 
 def preprocess_dataset(
-    dataset_dir: str,
+    datasets: List[str],
     sampling_rate: int,
     num_processes: int,
     training_dir: str,
@@ -98,4 +92,4 @@ def preprocess_dataset(
     pp = PreProcess(sampling_rate, training_dir)
     if os.path.exists(pp.gt_wavs_dir) and os.path.exists(pp.wavs16k_dir):
         return
-    pp.pipeline_mapping(dataset_dir, num_processes)
+    pp.pipeline_mapping(datasets, num_processes)

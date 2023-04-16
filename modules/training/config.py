@@ -54,3 +54,16 @@ class TrainConfig(BaseModel):
     train: TrainConfigTrain
     data: TrainConfigData
     model: TrainConfigModel
+
+
+class DatasetMetaItem(BaseModel):
+    gt_wav: str
+    co256: str
+    f0: Optional[str]
+    f0nsf: Optional[str]
+    speaker_id: int
+
+
+class DatasetMetadata(BaseModel):
+    files: Dict[str, DatasetMetaItem]
+    mute: DatasetMetaItem
