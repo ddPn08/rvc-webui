@@ -104,4 +104,5 @@ def save(model, sr: int, f0: int, filepath: str, epoch: int):
         state_dict = model.state_dict()
 
     state_dict = create_trained_model(state_dict, sr, f0, epoch)
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     torch.save(state_dict, filepath)
