@@ -135,6 +135,10 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
         opt_filepath_f0 = os.path.join(opt_dir_f0, name)
         opt_filepath_f0_nsf = os.path.join(opt_dir_f0_nsf, name)
         paths.append([dir, opt_filepath_f0, opt_filepath_f0_nsf])
+        
+    for dir in set([(os.path.dirname(p[1]), os.path.dirname(p[2])) for p in paths]):
+        os.makedirs(dir[0], exist_ok=True)
+        os.makedirs(dir[1], exist_ok=True)
 
     ps = []
     for i in range(num_processes):
