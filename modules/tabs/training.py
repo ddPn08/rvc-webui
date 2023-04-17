@@ -38,11 +38,13 @@ class Training(Tab):
             dataset_glob,
             speaker_id,
             num_cpu_process,
+            norm_audio_when_preprocess,
             pitch_extraction_algo,
             embedder_name,
             ignore_cache,
         ):
             f0 = f0 == "Yes"
+            norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             yield f"Training directory: {training_dir}"
 
@@ -55,7 +57,7 @@ class Training(Tab):
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
             )
             
             if f0:
@@ -78,6 +80,7 @@ class Training(Tab):
             speaker_id,
             gpu_id,
             num_cpu_process,
+            norm_audio_when_preprocess,
             pitch_extraction_algo,
             batch_size,
             cache_batch,
@@ -89,6 +92,7 @@ class Training(Tab):
             ignore_cache,
         ):
             f0 = f0 == "Yes"
+            norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             yield f"Training directory: {training_dir}"
 
@@ -101,7 +105,7 @@ class Training(Tab):
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
             )
 
             if f0:
@@ -171,6 +175,11 @@ class Training(Tab):
                             value="hubert_base",
                             label="Using phone embedder",
                         )
+                        norm_audio_when_preprocess = gr.Radio(
+                            choices=["Yes", "No"],
+                            value="Yes",
+                            label="Normalize audio volume when preprocess"
+                        )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",
@@ -232,6 +241,7 @@ class Training(Tab):
                 dataset_glob,
                 speaker_id,
                 num_cpu_process,
+                norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 embedder_name,
                 ignore_cache,
@@ -249,6 +259,7 @@ class Training(Tab):
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
+                norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 batch_size,
                 cache_batch,
