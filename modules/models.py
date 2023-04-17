@@ -113,9 +113,9 @@ class VC_MODEL:
         f0 = self.weight.get("f0", 1)
 
         if not faiss_index_file and auto_load_index:
-            faiss_index_file = self.get_index_path()
+            faiss_index_file = self.get_index_path(sid)
         if not big_npy_file and auto_load_index:
-            big_npy_file = self.get_big_npy_path()
+            big_npy_file = self.get_big_npy_path(sid)
 
         audio_opt = self.vc(
             embedder_model,
@@ -147,12 +147,18 @@ class VC_MODEL:
 
         return audio_opt
 
-    def get_big_npy_path(self):
+    def get_big_npy_path(self, speaker_id: int):
         basename = os.path.splitext(self.model_name)[0]
+        speaker_big_npy_path = os.path.join(MODELS_DIR, "checkpoints", f"{basename}_index", f"{basename}.{speaker_id}.big.npy")
+        if os.path.exists(speaker_big_npy_path):
+            return speaker_big_npy_path
         return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.big.npy")
 
-    def get_index_path(self):
+    def get_index_path(self, speaker_id: int):
         basename = os.path.splitext(self.model_name)[0]
+        speaker_index_path = os.path.join(MODELS_DIR, "checkpoints", f"{basename}_index", f"{basename}.{speaker_id}.index")
+        if os.path.exists(speaker_index_path):
+            return speaker_index_path
         return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.index")
 
 

@@ -158,30 +158,36 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool):
 def train_index(training_dir: str, model_name: str, emb_ch: int):
     checkpoint_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
-    npys = []
-    for name in [
-        os.path.join(dir, file) for dir in os.listdir(feature_256_dir)
-        for file in os.listdir(os.path.join(feature_256_dir, dir))
-        ]:
-        if name.endswith(".npy"):
-            phone = np.load(os.path.join(feature_256_dir, name))
+    index_dir = os.path.join(os.path.dirname(checkpoint_path), f"{model_name}_index")
+    os.makedirs(index_dir, exist_ok=True)
+    for speaker_id in tqdm.tqdm(
+        sorted([dir for dir in os.listdir(feature_256_dir) if dir.isdecimal()])
+        ):
+        feature_256_spk_dir = os.path.join(feature_256_dir, speaker_id)
+        speaker_id = int(speaker_id)
+        npys = []
+        for name in [
+            os.path.join(feature_256_spk_dir, file) for file in os.listdir(feature_256_spk_dir)
+            if file.endswith(".npy")
+            ]:
+            phone = np.load(os.path.join(feature_256_spk_dir, name))
             npys.append(phone)
 
-    big_npy = np.concatenate(npys, 0)
-    n_ivf = big_npy.shape[0] // 39
-    index = faiss.index_factory(emb_ch, f"IVF{n_ivf},Flat")
-    index_ivf = faiss.extract_index_ivf(index)
-    index_ivf.nprobe = int(np.power(n_ivf, 0.3))
-    index.train(big_npy)
-    index.add(big_npy)
-    np.save(
-        os.path.join(os.path.dirname(checkpoint_path), f"{model_name}.big.npy"),
-        big_npy,
-    )
-    faiss.write_index(
-        index,
-        os.path.join(os.path.dirname(checkpoint_path), f"{model_name}.index"),
-    )
+        big_npy = np.concatenate(npys, 0)
+        n_ivf = big_npy.shape[0] // 39
+        index = faiss.index_factory(emb_ch, f"IVF{n_ivf},Flat")
+        index_ivf = faiss.extract_index_ivf(index)
+        index_ivf.nprobe = int(np.power(n_ivf, 0.3))
+        index.train(big_npy)
+        index.add(big_npy)
+        np.save(
+            os.path.join(index_dir, f"{model_name}.{speaker_id}.big.npy"),
+            big_npy,
+        )
+        faiss.write_index(
+            index,
+            os.path.join(index_dir, f"{model_name}.{speaker_id}.index"),
+        )
 
 
 def train_model(
