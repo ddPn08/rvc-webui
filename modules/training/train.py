@@ -1,7 +1,9 @@
 import glob
 import json
 import os
+import re
 import time
+import operator
 from random import shuffle
 from typing import *
 
@@ -39,27 +41,55 @@ from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 
 
-def glob_dataset(glob_str: str):
+def glob_dataset(glob_str: str, speaker_id: int):
+    datasets_speakers = []
     if os.path.isdir(glob_str):
+        files = os.listdir(glob_str)
+        # pattern: {glob_str}/{decimal}[_]* and isdir
+        dirs = [(os.path.join(glob_str, f), int(f.split("_")[0])) for f in files if os.path.isdir(os.path.join(glob_str, f)) and f.split("_")[0].isdecimal()]
+        
+        if len(dirs) > 0:
+            # multi speakers at once train
+            match_files_re = re.compile(r'.+\.(wav|flac)')  # matches .wav and .flac
+            datasets_speakers = [(file, dir[1]) for dir in dirs for file in glob.iglob(os.path.join(dir[0], "*"), recursive=True) if match_files_re.search(file)]
+            # for dir in dirs:
+            #     for file in glob.iglob(dir[0], recursive=True):
+            #         if match_files_re.search(file):
+            #             datasets_speakers.append((file, dirs[1]))
+            # return sorted(datasets_speakers, key=operator.itemgetter(0))
+        
         glob_str = os.path.join(glob_str, "*.wav")
-    return sorted(glob.glob(glob_str, recursive=True))
+        
+    datasets_speakers.extend([(file, speaker_id) for file in glob.iglob(glob_str, recursive=True)])
+    
+    return sorted(datasets_speakers, key=operator.itemgetter(0))
 
 
-def create_dataset_meta(training_dir: str, sr: str, f0: bool, speaker_id: int):
+def create_dataset_meta(training_dir: str, sr: str, f0: bool):
     gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
     co256_dir = os.path.join(training_dir, "3_feature256")
 
-    names = set([name.split(".")[0] for name in os.listdir(gt_wavs_dir)]) & set(
-        [name.split(".")[0] for name in os.listdir(co256_dir)]
-    )
+    names = set([
+        os.path.join(dir, name.split(".")[0]) for dir in os.listdir(gt_wavs_dir)
+        for name in os.listdir(os.path.join(gt_wavs_dir, dir))
+    ]) & set([
+        os.path.join(dir, name.split(".")[0]) for dir in os.listdir(co256_dir)
+        for name in os.listdir(os.path.join(co256_dir, dir))
+    ])
 
     if f0:
         f0_dir = os.path.join(training_dir, "2a_f0")
         f0nsf_dir = os.path.join(training_dir, "2b_f0nsf")
         names = (
             names
-            & set([name.split(".")[0] for name in os.listdir(f0_dir)])
-            & set([name.split(".")[0] for name in os.listdir(f0nsf_dir)])
+            & set([
+                os.path.join(dir, name.split(".")[0]) for dir in os.listdir(f0_dir)
+                for name in os.listdir(os.path.join(f0_dir, dir))
+            ])
+            & set([
+                os.path.join(dir, name.split(".")[0]) for dir in os.listdir(f0nsf_dir)
+                for name in os.listdir(os.path.join(f0nsf_dir, dir))
+            ])
         )
 
     meta = {
@@ -67,6 +97,8 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool, speaker_id: int):
     }
 
     for name in names:
+        speaker_id = os.path.dirname(name).split("_")[0]
+        speaker_id = int(speaker_id) if speaker_id.isdecimal() else 0
         if f0:
             gt_wav_path = os.path.join(gt_wavs_dir, f"{name}.wav")
             co256_path = os.path.join(co256_dir, f"{name}.npy")
@@ -127,9 +159,12 @@ def train_index(training_dir: str, model_name: str, emb_ch: int):
     checkpoint_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
     npys = []
-    for name in os.listdir(feature_256_dir):
+    for name in [
+        os.path.join(dir, file) for dir in os.listdir(feature_256_dir)
+        for file in os.listdir(os.path.join(feature_256_dir, dir))
+        ]:
         if name.endswith(".npy"):
-            phone = np.load(f"{feature_256_dir}/{name}")
+            phone = np.load(os.path.join(feature_256_dir, name))
             npys.append(phone)
 
     big_npy = np.concatenate(npys, 0)

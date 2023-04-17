@@ -124,8 +124,11 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
 
     os.makedirs(opt_dir_f0, exist_ok=True)
     os.makedirs(opt_dir_f0_nsf, exist_ok=True)
-
-    for name in sorted(list(os.listdir(dataset_dir))):
+    
+    for name in [
+        os.path.join(dir, f) for dir in sorted(list(os.listdir(dataset_dir))) if os.path.isdir(os.path.join(dataset_dir, dir))
+        for f in sorted(list(os.listdir(os.path.join(dataset_dir, dir))))
+        ]:  # dataset_dir/{05d}/file.ext
         dir = os.path.join(dataset_dir, name)
         if "spec" in dir:
             continue
@@ -221,6 +224,8 @@ def extract_feature(training_dir: str, embedder_name: str):
 
                     if os.path.exists(out_filepath):
                         continue
+                    
+                    os.makedirs(os.path.dirname(out_filepath), exist_ok=True)
 
                     feats = readwave(wav_filepath, normalize=cfg.task.normalize)
                     padding_mask = torch.BoolTensor(feats.shape).fill_(False)
@@ -254,7 +259,10 @@ def extract_feature(training_dir: str, embedder_name: str):
                 traceback.print_exc()
 
     async def run_tasks():
-        todo = sorted(list(os.listdir(wav_dir)))
+        todo = [
+            os.path.join(dir, f) for dir in sorted(list(os.listdir(wav_dir))) if os.path.isdir(os.path.join(wav_dir, dir))
+            for f in sorted(list(os.listdir(os.path.join(wav_dir, dir))))
+        ]
         loop = asyncio.get_event_loop()
         await asyncio.gather(
             *[
