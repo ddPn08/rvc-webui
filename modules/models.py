@@ -99,15 +99,15 @@ class VC_MODEL:
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
         times = [0, 0, 0]
-        if embedder_model == None or loaded_embedder_model != self.embedder_name:
-            load_emb_dic = {
-                "hubert_base": ("hubert_base.pt", "hubert_base"),
-                "hubert_base768": ("hubert_base.pt", "hubert_base"),
-                "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
-                "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
-            }
-            if not self.embedder_name in load_emb_dic.keys():
-                raise Exception(f"Not supported embedder: {self.embedder_name}")
+        load_emb_dic = {
+            "hubert_base": ("hubert_base.pt", "hubert_base"),
+            "hubert_base768": ("hubert_base.pt", "hubert_base"),
+            "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
+            "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
+        }
+        if not self.embedder_name in load_emb_dic.keys():
+            raise Exception(f"Not supported embedder: {self.embedder_name}")
+        if embedder_model == None or loaded_embedder_model != load_emb_dic[self.embedder_name][1]:
             print(f"load {self.embedder_name} embedder")
             load_embedder(load_emb_dic[self.embedder_name][0], load_emb_dic[self.embedder_name][1])
         f0 = self.weight.get("f0", 1)
