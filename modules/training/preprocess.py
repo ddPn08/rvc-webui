@@ -6,6 +6,7 @@ from typing import *
 import librosa
 import numpy as np
 import tqdm
+import scipy.signal as signal
 from scipy.io import wavfile
 
 from modules.models import MODELS_DIR
@@ -31,6 +32,7 @@ class PreProcess:
             max_sil_kept=150,
         )
         self.sr = sampling_rate
+        self.bh, self.ah = signal.butter(N=5, Wn=48, btype="high", fs=self.sr)
         self.per = 3.7
         self.overlap = 0.3
         self.tail = self.per + self.overlap
@@ -50,7 +52,9 @@ class PreProcess:
             self.sr,
             (tmp_audio * 32768).astype(np.int16),
         )
-        tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)
+        tmp_audio = librosa.resample(
+            tmp_audio, orig_sr=self.sr, target_sr=16000, res_type="soxr_vhq"
+        )
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
             16000,
@@ -64,7 +68,9 @@ class PreProcess:
             self.sr,
             (tmp_audio * 32768).astype(np.int16),
         )
-        tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)
+        tmp_audio = librosa.resample(
+            tmp_audio, orig_sr=self.sr, target_sr=16000, res_type="soxr_vhq"
+        )
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{speaker_id:05}", "mute.wav"),
             16000,
@@ -74,6 +80,8 @@ class PreProcess:
     def pipeline(self, speaker_id: int, path: str, index: int, is_normalize: bool):
         try:
             audio = load_audio(path, self.sr)
+            audio = signal.lfilter(self.bh, self.ah, audio)
+
             idx1 = 0
             for audio in self.slicer.slice(audio):
                 i = 0

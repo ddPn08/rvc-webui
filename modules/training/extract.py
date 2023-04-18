@@ -29,7 +29,7 @@ class FeatureInput(object):
         self.f0_mel_max = 1127 * np.log(1 + self.f0_max / 700)
 
     def compute_f0(self, path, f0_method):
-        x, sr = librosa.load(path, sr=self.fs)
+        x, sr = librosa.load(path, sr=self.fs, res_type='soxr_vhq')
         p_len = x.shape[0] // self.hop
         assert sr == self.fs
         if f0_method == "pm":
@@ -125,18 +125,24 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
     os.makedirs(opt_dir_f0, exist_ok=True)
     os.makedirs(opt_dir_f0_nsf, exist_ok=True)
 
-    for name in [
-        os.path.join(dir, f)
-        for dir in sorted(list(os.listdir(dataset_dir)))
-        if os.path.isdir(os.path.join(dataset_dir, dir))
-        for f in sorted(list(os.listdir(os.path.join(dataset_dir, dir))))
-    ]:  # dataset_dir/{05d}/file.ext
-        dir = os.path.join(dataset_dir, name)
-        if "spec" in dir:
+    names = []
+
+    for pathname in sorted(list(os.listdir(dataset_dir))):
+        if os.path.isdir(os.path.join(dataset_dir, pathname)):
+            for f in sorted(list(os.listdir(os.path.join(dataset_dir, pathname)))):
+                if "spec" in f:
+                    continue
+                names.append(os.path.join(pathname, f))
+        else:
+            names.append(pathname)
+
+    for name in names:  # dataset_dir/{05d}/file.ext
+        filepath = os.path.join(dataset_dir, name)
+        if "spec" in filepath:
             continue
         opt_filepath_f0 = os.path.join(opt_dir_f0, name)
         opt_filepath_f0_nsf = os.path.join(opt_dir_f0_nsf, name)
-        paths.append([dir, opt_filepath_f0, opt_filepath_f0_nsf])
+        paths.append([filepath, opt_filepath_f0, opt_filepath_f0_nsf])
 
     for dir in set([(os.path.dirname(p[1]), os.path.dirname(p[2])) for p in paths]):
         os.makedirs(dir[0], exist_ok=True)
@@ -268,15 +274,16 @@ def extract_feature(training_dir: str, embedder_name: str):
                 print(f"Error: {e} {file}")
                 traceback.print_exc()
 
-    async def run_tasks():
-        todo = [
-            os.path.join(dir, f)
-            for dir in sorted(list(os.listdir(wav_dir)))
-            if os.path.isdir(os.path.join(wav_dir, dir))
-            for f in sorted(list(os.listdir(os.path.join(wav_dir, dir))))
-        ]
-        loop = asyncio.get_event_loop()
-        await asyncio.gather(
+    todo = [
+        os.path.join(dir, f)
+        for dir in sorted(list(os.listdir(wav_dir)))
+        if os.path.isdir(os.path.join(wav_dir, dir))
+        for f in sorted(list(os.listdir(os.path.join(wav_dir, dir))))
+    ]
+
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(
+        asyncio.gather(
             *[
                 loop.run_in_executor(
                     None, process, todo[i::num_gpus], torch.device(f"cuda:{i}")
@@ -284,6 +291,4 @@ def extract_feature(training_dir: str, embedder_name: str):
                 for i in range(num_gpus)
             ]
         )
-
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(run_tasks())
+    )

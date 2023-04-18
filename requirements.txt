@@ -1,7 +1,8 @@
 gradio==3.25.0
 tqdm==4.65.0
 numpy==1.23.5
-faiss-cpu==1.7.2
+faiss-cpu==1.7.0; sys_platform == "darwin"
+faiss-cpu==1.7.2; sys_platform != "darwin"
 fairseq==0.12.2
 matplotlib==3.7.1
 scipy==1.9.3
@@ -11,6 +12,7 @@ pyworld==0.3.2
 soundfile==0.12.1
 ffmpeg-python==0.2.0
 pydub==0.25.1
+soxr==0.3.5
 
 tensorboard
 tensorboardX

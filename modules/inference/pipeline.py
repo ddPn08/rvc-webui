@@ -11,8 +11,6 @@ import torch.nn.functional as F
 
 from modules.shared import is_half
 
-bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
-
 if is_half:
     # 6G显存配置
     x_pad = 3
@@ -225,7 +223,10 @@ class VC(object):
                 index = big_npy = None
         else:
             index = big_npy = None
+
+        bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
         audio = signal.filtfilt(bh, ah, audio)
+
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
         opt_ts = []
         if audio_pad.shape[0] > self.t_max:

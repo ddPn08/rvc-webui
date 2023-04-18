@@ -400,48 +400,51 @@ def training_runner(
     if last_d_state is None or last_g_state is None:
         epoch = 1
         global_step = 0
-        net_g_state = torch.load(pretrain_g, map_location="cpu")["model"]
-        emb_phone_size = (config.model.hidden_channels, config.model.emb_channels)
-        if emb_phone_size != net_g_state["enc_p.emb_phone.weight"].size():
-            # interpolate
-            orig_shape = net_g_state["enc_p.emb_phone.weight"].size()
-            if net_g_state["enc_p.emb_phone.weight"].dtype == torch.half:
-                net_g_state["enc_p.emb_phone.weight"] = (
-                    F.interpolate(
-                        net_g_state["enc_p.emb_phone.weight"]
-                        .float()
-                        .unsqueeze(0)
-                        .unsqueeze(0),
-                        size=emb_phone_size,
-                        mode="bilinear",
+        if os.path.exists(pretrain_g) and os.path.exists(pretrain_d):
+            net_g_state = torch.load(pretrain_g, map_location="cpu")["model"]
+            emb_phone_size = (config.model.hidden_channels, config.model.emb_channels)
+            if emb_phone_size != net_g_state["enc_p.emb_phone.weight"].size():
+                # interpolate
+                orig_shape = net_g_state["enc_p.emb_phone.weight"].size()
+                if net_g_state["enc_p.emb_phone.weight"].dtype == torch.half:
+                    net_g_state["enc_p.emb_phone.weight"] = (
+                        F.interpolate(
+                            net_g_state["enc_p.emb_phone.weight"]
+                            .float()
+                            .unsqueeze(0)
+                            .unsqueeze(0),
+                            size=emb_phone_size,
+                            mode="bilinear",
+                        )
+                        .half()
+                        .squeeze(0)
+                        .squeeze(0)
                     )
-                    .half()
-                    .squeeze(0)
-                    .squeeze(0)
-                )
-            else:
-                net_g_state["enc_p.emb_phone.weight"] = (
-                    F.interpolate(
-                        net_g_state["enc_p.emb_phone.weight"].unsqueeze(0).unsqueeze(0),
-                        size=emb_phone_size,
-                        mode="bilinear",
+                else:
+                    net_g_state["enc_p.emb_phone.weight"] = (
+                        F.interpolate(
+                            net_g_state["enc_p.emb_phone.weight"]
+                            .unsqueeze(0)
+                            .unsqueeze(0),
+                            size=emb_phone_size,
+                            mode="bilinear",
+                        )
+                        .squeeze(0)
+                        .squeeze(0)
                     )
-                    .squeeze(0)
-                    .squeeze(0)
+                print(
+                    "interpolated pretrained state enc_p.emb_phone from",
+                    orig_shape,
+                    "to",
+                    emb_phone_size,
                 )
-            print(
-                "interpolated pretrained state enc_p.emb_phone from",
-                orig_shape,
-                "to",
-                emb_phone_size,
+            net_g.module.load_state_dict(net_g_state)
+            del net_g_state
+            net_d.module.load_state_dict(
+                torch.load(pretrain_d, map_location="cpu")["model"]
             )
-        net_g.module.load_state_dict(net_g_state)
-        del net_g_state
-        net_d.module.load_state_dict(
-            torch.load(pretrain_d, map_location="cpu")["model"]
-        )
-        if is_main_process:
-            print(f"loaded pretrained {pretrain_g} {pretrain_d}")
+            if is_main_process:
+                print(f"loaded pretrained {pretrain_g} {pretrain_d}")
     else:
         _, _, _, epoch = utils.load_checkpoint(last_d_state, net_d, optim_d)
         _, _, _, epoch = utils.load_checkpoint(last_g_state, net_g, optim_g)
