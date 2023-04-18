@@ -1,7 +1,7 @@
-from typing import *
-import os
 import operator
+import os
 import traceback
+from typing import *
 
 import librosa
 import numpy as np
@@ -12,7 +12,6 @@ from modules.models import MODELS_DIR
 from modules.utils import load_audio
 
 from .slicer import Slicer
-
 
 SR_K_DICT = {
     32000: "32k",
@@ -43,9 +42,9 @@ class PreProcess:
 
     def norm_write(self, tmp_audio, idx0, idx1, speaker_id, is_normalize):
         if is_normalize:
-            tmp_audio = (tmp_audio / np.abs(tmp_audio).max() * (self.max * self.alpha)) + (
-                1 - self.alpha
-            ) * tmp_audio
+            tmp_audio = (
+                tmp_audio / np.abs(tmp_audio).max() * (self.max * self.alpha)
+            ) + (1 - self.alpha) * tmp_audio
         wavfile.write(
             os.path.join(self.gt_wavs_dir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
             self.sr,
@@ -57,7 +56,7 @@ class PreProcess:
             16000,
             (tmp_audio * 32768).astype(np.int16),
         )
-        
+
     def write_mute(self, mute_wave_filename, speaker_id):
         tmp_audio = load_audio(mute_wave_filename, self.sr)
         wavfile.write(
@@ -83,7 +82,9 @@ class PreProcess:
                     i += 1
                     if len(audio[start:]) > self.tail * self.sr:
                         tmp_audio = audio[start : start + int(self.per * self.sr)]
-                        self.norm_write(tmp_audio, index, idx1, speaker_id, is_normalize)
+                        self.norm_write(
+                            tmp_audio, index, idx1, speaker_id, is_normalize
+                        )
                         idx1 += 1
                     else:
                         tmp_audio = audio[start:]
@@ -92,11 +93,19 @@ class PreProcess:
         except:
             traceback.print_exc()
 
-    def pipeline_mapping(self, datasets: List[Tuple[str, int]], num_processes: int, is_normalize: bool):
+    def pipeline_mapping(
+        self, datasets: List[Tuple[str, int]], num_processes: int, is_normalize: bool
+    ):
         for speaker_id in set([spk for _, spk in datasets]):
-            os.makedirs(os.path.join(self.gt_wavs_dir, f"{speaker_id:05}"), exist_ok=True)
-            os.makedirs(os.path.join(self.wavs16k_dir, f"{speaker_id:05}"), exist_ok=True)
-        for index, path_spk in enumerate(tqdm.tqdm(sorted(datasets, key=operator.itemgetter(0)))):
+            os.makedirs(
+                os.path.join(self.gt_wavs_dir, f"{speaker_id:05}"), exist_ok=True
+            )
+            os.makedirs(
+                os.path.join(self.wavs16k_dir, f"{speaker_id:05}"), exist_ok=True
+            )
+        for index, path_spk in enumerate(
+            tqdm.tqdm(sorted(datasets, key=operator.itemgetter(0)))
+        ):
             self.pipeline(path_spk[1], path_spk[0], index, is_normalize)
 
         # def task(infos):
@@ -109,7 +118,7 @@ class PreProcess:
 
 
 def preprocess_dataset(
-    datasets: List[Tuple[str, int]],    # List[(path, speaker_id)]
+    datasets: List[Tuple[str, int]],  # List[(path, speaker_id)]
     sampling_rate: int,
     num_processes: int,
     training_dir: str,
@@ -119,8 +128,14 @@ def preprocess_dataset(
     if os.path.exists(pp.gt_wavs_dir) and os.path.exists(pp.wavs16k_dir):
         return
     pp.pipeline_mapping(datasets, num_processes, is_normalize)
-    
+
     # process mute file
-    mute_wav = os.path.join(MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{SR_K_DICT[sampling_rate]}.wav")
+    mute_wav = os.path.join(
+        MODELS_DIR,
+        "training",
+        "mute",
+        "0_gt_wavs",
+        f"mute{SR_K_DICT[sampling_rate]}.wav",
+    )
     for speaker_id in set([spk for _, spk in datasets]):
         pp.write_mute(mute_wav, speaker_id)

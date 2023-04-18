@@ -6,7 +6,7 @@ import requests
 import torch
 
 
-def load_audio(file, sr):
+def load_audio(file: str, sr):
     try:
         # https://github.com/openai/whisper/blob/main/whisper/audio.py#L26
         # This launches a subprocess to decode audio while down-mixing and resampling as necessary.

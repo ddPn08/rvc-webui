@@ -1,9 +1,9 @@
 import glob
 import json
+import operator
 import os
 import re
 import time
-import operator
 from random import shuffle
 from typing import *
 
@@ -46,22 +46,33 @@ def glob_dataset(glob_str: str, speaker_id: int):
     if os.path.isdir(glob_str):
         files = os.listdir(glob_str)
         # pattern: {glob_str}/{decimal}[_]* and isdir
-        dirs = [(os.path.join(glob_str, f), int(f.split("_")[0])) for f in files if os.path.isdir(os.path.join(glob_str, f)) and f.split("_")[0].isdecimal()]
-        
+        dirs = [
+            (os.path.join(glob_str, f), int(f.split("_")[0]))
+            for f in files
+            if os.path.isdir(os.path.join(glob_str, f)) and f.split("_")[0].isdecimal()
+        ]
+
         if len(dirs) > 0:
             # multi speakers at once train
-            match_files_re = re.compile(r'.+\.(wav|flac)')  # matches .wav and .flac
-            datasets_speakers = [(file, dir[1]) for dir in dirs for file in glob.iglob(os.path.join(dir[0], "*"), recursive=True) if match_files_re.search(file)]
+            match_files_re = re.compile(r".+\.(wav|flac)")  # matches .wav and .flac
+            datasets_speakers = [
+                (file, dir[1])
+                for dir in dirs
+                for file in glob.iglob(os.path.join(dir[0], "*"), recursive=True)
+                if match_files_re.search(file)
+            ]
             # for dir in dirs:
             #     for file in glob.iglob(dir[0], recursive=True):
             #         if match_files_re.search(file):
             #             datasets_speakers.append((file, dirs[1]))
             # return sorted(datasets_speakers, key=operator.itemgetter(0))
-        
+
         glob_str = os.path.join(glob_str, "*.wav")
-        
-    datasets_speakers.extend([(file, speaker_id) for file in glob.iglob(glob_str, recursive=True)])
-    
+
+    datasets_speakers.extend(
+        [(file, speaker_id) for file in glob.iglob(glob_str, recursive=True)]
+    )
+
     return sorted(datasets_speakers, key=operator.itemgetter(0))
 
 
@@ -69,27 +80,39 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool):
     gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
     co256_dir = os.path.join(training_dir, "3_feature256")
 
-    names = set([
-        os.path.join(dir, name.split(".")[0]) for dir in os.listdir(gt_wavs_dir)
-        for name in os.listdir(os.path.join(gt_wavs_dir, dir))
-    ]) & set([
-        os.path.join(dir, name.split(".")[0]) for dir in os.listdir(co256_dir)
-        for name in os.listdir(os.path.join(co256_dir, dir))
-    ])
+    names = set(
+        [
+            os.path.join(dir, name.split(".")[0])
+            for dir in os.listdir(gt_wavs_dir)
+            for name in os.listdir(os.path.join(gt_wavs_dir, dir))
+        ]
+    ) & set(
+        [
+            os.path.join(dir, name.split(".")[0])
+            for dir in os.listdir(co256_dir)
+            for name in os.listdir(os.path.join(co256_dir, dir))
+        ]
+    )
 
     if f0:
         f0_dir = os.path.join(training_dir, "2a_f0")
         f0nsf_dir = os.path.join(training_dir, "2b_f0nsf")
         names = (
             names
-            & set([
-                os.path.join(dir, name.split(".")[0]) for dir in os.listdir(f0_dir)
-                for name in os.listdir(os.path.join(f0_dir, dir))
-            ])
-            & set([
-                os.path.join(dir, name.split(".")[0]) for dir in os.listdir(f0nsf_dir)
-                for name in os.listdir(os.path.join(f0nsf_dir, dir))
-            ])
+            & set(
+                [
+                    os.path.join(dir, name.split(".")[0])
+                    for dir in os.listdir(f0_dir)
+                    for name in os.listdir(os.path.join(f0_dir, dir))
+                ]
+            )
+            & set(
+                [
+                    os.path.join(dir, name.split(".")[0])
+                    for dir in os.listdir(f0nsf_dir)
+                    for name in os.listdir(os.path.join(f0nsf_dir, dir))
+                ]
+            )
         )
 
     meta = {
@@ -162,14 +185,15 @@ def train_index(training_dir: str, model_name: str, emb_ch: int):
     os.makedirs(index_dir, exist_ok=True)
     for speaker_id in tqdm.tqdm(
         sorted([dir for dir in os.listdir(feature_256_dir) if dir.isdecimal()])
-        ):
+    ):
         feature_256_spk_dir = os.path.join(feature_256_dir, speaker_id)
         speaker_id = int(speaker_id)
         npys = []
         for name in [
-            os.path.join(feature_256_spk_dir, file) for file in os.listdir(feature_256_spk_dir)
+            os.path.join(feature_256_spk_dir, file)
+            for file in os.listdir(feature_256_spk_dir)
             if file.endswith(".npy")
-            ]:
+        ]:
             phone = np.load(os.path.join(feature_256_spk_dir, name))
             npys.append(phone)
 
@@ -216,8 +240,10 @@ def train_model(
     torch.backends.cudnn.benchmark = False
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
-    
-    config = utils.load_config(training_dir, sample_rate, 768 if embedder_name.endswith("768") else 256)
+
+    config = utils.load_config(
+        training_dir, sample_rate, 768 if embedder_name.endswith("768") else 256
+    )
 
     start = time.perf_counter()
 
@@ -380,18 +406,36 @@ def training_runner(
             # interpolate
             orig_shape = net_g_state["enc_p.emb_phone.weight"].size()
             if net_g_state["enc_p.emb_phone.weight"].dtype == torch.half:
-                net_g_state["enc_p.emb_phone.weight"] = F.interpolate(net_g_state["enc_p.emb_phone.weight"].float().unsqueeze(0).unsqueeze(0), size=emb_phone_size, mode="bilinear").half().squeeze(0).squeeze(0)
+                net_g_state["enc_p.emb_phone.weight"] = (
+                    F.interpolate(
+                        net_g_state["enc_p.emb_phone.weight"]
+                        .float()
+                        .unsqueeze(0)
+                        .unsqueeze(0),
+                        size=emb_phone_size,
+                        mode="bilinear",
+                    )
+                    .half()
+                    .squeeze(0)
+                    .squeeze(0)
+                )
             else:
-                net_g_state["enc_p.emb_phone.weight"] = F.interpolate(net_g_state["enc_p.emb_phone.weight"].unsqueeze(0).unsqueeze(0), size=emb_phone_size, mode="bilinear").squeeze(0).squeeze(0)
+                net_g_state["enc_p.emb_phone.weight"] = (
+                    F.interpolate(
+                        net_g_state["enc_p.emb_phone.weight"].unsqueeze(0).unsqueeze(0),
+                        size=emb_phone_size,
+                        mode="bilinear",
+                    )
+                    .squeeze(0)
+                    .squeeze(0)
+                )
             print(
                 "interpolated pretrained state enc_p.emb_phone from",
                 orig_shape,
                 "to",
                 emb_phone_size,
             )
-        net_g.module.load_state_dict(
-            net_g_state
-        )
+        net_g.module.load_state_dict(net_g_state)
         del net_g_state
         net_d.module.load_state_dict(
             torch.load(pretrain_d, map_location="cpu")["model"]

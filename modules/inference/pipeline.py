@@ -1,6 +1,5 @@
 import os
 import traceback
-from time import time as ttime
 
 import faiss
 import numpy as np
@@ -11,7 +10,6 @@ import torch
 import torch.nn.functional as F
 
 from modules.shared import is_half
-
 
 bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
 
@@ -106,16 +104,15 @@ class VC(object):
         model,
         net_g,
         sid,
-        audio0,
+        audio,
         pitch,
         pitchf,
-        times,
         index,
         big_npy,
         index_rate,
         embedder_name,
     ):  # ,file_index,file_big_npy
-        feats = torch.from_numpy(audio0)
+        feats = torch.from_numpy(audio)
         if self.is_half:
             feats = feats.half()
         else:
@@ -141,7 +138,7 @@ class VC(object):
                 # no pass "output_layer"
             }
         )
-        t0 = ttime()
+
         with torch.no_grad():
             logits = model.extract_features(**inputs)
             if is_feats_dim_768:
@@ -167,8 +164,8 @@ class VC(object):
             )
 
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
-        t1 = ttime()
-        p_len = audio0.shape[0] // self.window
+
+        p_len = audio.shape[0] // self.window
         if feats.shape[1] < p_len:
             p_len = feats.shape[1]
             if pitch != None and pitchf != None:
@@ -195,9 +192,6 @@ class VC(object):
         del feats, p_len, padding_mask
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        t2 = ttime()
-        times[0] += t1 - t0
-        times[2] += t2 - t1
         return audio1
 
     def __call__(
@@ -206,7 +200,6 @@ class VC(object):
         net_g,
         sid,
         audio,
-        times,
         f0_up_key,
         f0_method,
         file_index,
@@ -247,10 +240,7 @@ class VC(object):
                         == np.abs(audio_sum[t - self.t_query : t + self.t_query]).min()
                     )[0][0]
                 )
-        s = 0
-        audio_opt = []
-        t = None
-        t1 = ttime()
+
         audio_pad = np.pad(audio, (self.t_pad, self.t_pad), mode="reflect")
         p_len = audio_pad.shape[0] // self.window
         inp_f0 = None
@@ -272,8 +262,12 @@ class VC(object):
             pitchf = pitchf[:p_len]
             pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
             pitchf = torch.tensor(pitchf, device=self.device).unsqueeze(0).float()
-        t2 = ttime()
-        times[1] += t2 - t1
+
+        audio_opt = []
+
+        s = 0
+        t = None
+
         for t in opt_ts:
             t = t // self.window * self.window
             if if_f0 == 1:
@@ -285,7 +279,6 @@ class VC(object):
                         audio_pad[s : t + self.t_pad2 + self.window],
                         pitch[:, s // self.window : (t + self.t_pad2) // self.window],
                         pitchf[:, s // self.window : (t + self.t_pad2) // self.window],
-                        times,
                         index,
                         big_npy,
                         index_rate,
@@ -301,7 +294,6 @@ class VC(object):
                         audio_pad[s : t + self.t_pad2 + self.window],
                         None,
                         None,
-                        times,
                         index,
                         big_npy,
                         index_rate,
@@ -318,7 +310,6 @@ class VC(object):
                     audio_pad[t:],
                     pitch[:, t // self.window :] if t is not None else pitch,
                     pitchf[:, t // self.window :] if t is not None else pitchf,
-                    times,
                     index,
                     big_npy,
                     index_rate,
@@ -334,7 +325,6 @@ class VC(object):
                     audio_pad[t:],
                     None,
                     None,
-                    times,
                     index,
                     big_npy,
                     index_rate,

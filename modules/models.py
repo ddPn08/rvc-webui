@@ -1,20 +1,18 @@
 import asyncio
 import os
-from typing import *
-
 import posixpath
+from typing import *
 from urllib.parse import urlparse
 
 import torch
-from pydub import AudioSegment
 from fairseq import checkpoint_utils
+from pydub import AudioSegment
 
 from .cmd_opts import opts
 from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
 from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
 from .utils import donwload_file, load_audio
-
 
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
@@ -84,21 +82,21 @@ class VC_MODEL:
 
     def single(
         self,
-        sid,
-        input_audio,
-        f0_up_key,
-        f0_file,
-        f0_method,
-        auto_load_index,
-        faiss_index_file,
-        big_npy_file,
-        index_rate,
+        sid: int,
+        input_audio: str,
+        f0_up_key: int,
+        f0_file: str,
+        f0_method: str,
+        auto_load_index: bool,
+        faiss_index_file: str,
+        big_npy_file: str,
+        index_rate: float,
     ):
         if input_audio is None:
             raise Exception("You need to upload an audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
-        times = [0, 0, 0]
+
         load_emb_dic = {
             "hubert_base": ("hubert_base.pt", "hubert_base"),
             "hubert_base768": ("hubert_base.pt", "hubert_base"),
@@ -107,9 +105,14 @@ class VC_MODEL:
         }
         if not self.embedder_name in load_emb_dic.keys():
             raise Exception(f"Not supported embedder: {self.embedder_name}")
-        if embedder_model == None or loaded_embedder_model != load_emb_dic[self.embedder_name][1]:
+        if (
+            embedder_model == None
+            or loaded_embedder_model != load_emb_dic[self.embedder_name][1]
+        ):
             print(f"load {self.embedder_name} embedder")
-            load_embedder(load_emb_dic[self.embedder_name][0], load_emb_dic[self.embedder_name][1])
+            load_embedder(
+                load_emb_dic[self.embedder_name][0], load_emb_dic[self.embedder_name][1]
+            )
         f0 = self.weight.get("f0", 1)
 
         if not faiss_index_file and auto_load_index:
@@ -122,7 +125,6 @@ class VC_MODEL:
             self.net_g,
             sid,
             audio,
-            times,
             f0_up_key,
             f0_method,
             faiss_index_file,
@@ -149,14 +151,24 @@ class VC_MODEL:
 
     def get_big_npy_path(self, speaker_id: int):
         basename = os.path.splitext(self.model_name)[0]
-        speaker_big_npy_path = os.path.join(MODELS_DIR, "checkpoints", f"{basename}_index", f"{basename}.{speaker_id}.big.npy")
+        speaker_big_npy_path = os.path.join(
+            MODELS_DIR,
+            "checkpoints",
+            f"{basename}_index",
+            f"{basename}.{speaker_id}.big.npy",
+        )
         if os.path.exists(speaker_big_npy_path):
             return speaker_big_npy_path
         return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.big.npy")
 
     def get_index_path(self, speaker_id: int):
         basename = os.path.splitext(self.model_name)[0]
-        speaker_index_path = os.path.join(MODELS_DIR, "checkpoints", f"{basename}_index", f"{basename}.{speaker_id}.index")
+        speaker_index_path = os.path.join(
+            MODELS_DIR,
+            "checkpoints",
+            f"{basename}_index",
+            f"{basename}.{speaker_id}.index",
+        )
         if os.path.exists(speaker_index_path):
             return speaker_index_path
         return os.path.join(MODELS_DIR, "checkpoints", f"{basename}.index")
@@ -186,7 +198,7 @@ def download_models():
 
     if len(tasks) > 0:
         loop.run_until_complete(asyncio.gather(*tasks))
-        
+
     for url in [
         "https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/hubert_base.pt",
         "https://huggingface.co/innnky/contentvec/resolve/main/checkpoint_best_legacy_500.pt",
@@ -219,7 +231,7 @@ def load_embedder(emb_file, emb_name):
     else:
         embedder_model = embedder_model.float()
     embedder_model.eval()
-    
+
     loaded_embedder_model = emb_name
 
 
@@ -236,9 +248,9 @@ def load_hubert():
     else:
         embedder_model = embedder_model.float()
     embedder_model.eval()
-    
+
     loaded_embedder_model = "hubert_base"
-    
+
 
 def load_contentvec():
     global embedder_model, loaded_embedder_model
@@ -253,7 +265,7 @@ def load_contentvec():
     else:
         embedder_model = embedder_model.float()
     embedder_model.eval()
-    
+
     loaded_embedder_model = "contentvec"
 
 

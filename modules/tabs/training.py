@@ -57,9 +57,13 @@ class Training(Tab):
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
+                datasets,
+                SR_DICT[target_sr],
+                num_cpu_process,
+                training_dir,
+                norm_audio_when_preprocess,
             )
-            
+
             if f0:
                 yield "Extracting f0..."
                 extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
@@ -68,7 +72,11 @@ class Training(Tab):
             extract_feature(training_dir, embedder_name)
 
             yield "Training index..."
-            train_index(training_dir, model_name, 256 if not embedder_name.endswith("768") else 768)
+            train_index(
+                training_dir,
+                model_name,
+                256 if not embedder_name.endswith("768") else 768,
+            )
 
             yield "Training complete"
 
@@ -105,7 +113,11 @@ class Training(Tab):
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
+                datasets,
+                SR_DICT[target_sr],
+                num_cpu_process,
+                training_dir,
+                norm_audio_when_preprocess,
             )
 
             if f0:
@@ -118,7 +130,7 @@ class Training(Tab):
             create_dataset_meta(training_dir, target_sr, f0)
 
             yield "Training model..."
-            
+
             print(f"train_all: emb_name: {embedder_name}")
 
             train_model(
@@ -171,14 +183,19 @@ class Training(Tab):
                             maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
                         )
                         embedder_name = gr.Radio(
-                            choices=["hubert_base", "contentvec", "hubert_base768", "contentvec768"],
+                            choices=[
+                                "hubert_base",
+                                "contentvec",
+                                "hubert_base768",
+                                "contentvec768",
+                            ],
                             value="hubert_base",
                             label="Using phone embedder",
                         )
                         norm_audio_when_preprocess = gr.Radio(
                             choices=["Yes", "No"],
                             value="Yes",
-                            label="Normalize audio volume when preprocess"
+                            label="Normalize audio volume when preprocess",
                         )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
