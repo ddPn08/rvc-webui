@@ -219,6 +219,7 @@ class VC(object):
             try:
                 index = faiss.read_index(file_index)
                 big_npy = np.load(file_big_npy)
+                print(f"Loaded {file_index} and {file_big_npy}")
             except:
                 traceback.print_exc()
                 index = big_npy = None

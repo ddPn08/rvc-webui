@@ -631,6 +631,13 @@ def training_runner(
             scaler.update()
 
             if is_main_process:
+                progress_bar.set_postfix(
+                    epoch=epoch,
+                    loss_g=float(loss_gen_all) if loss_gen_all is not None else 0.0,
+                    loss_d=float(loss_disc) if loss_disc is not None else 0.0,
+                    lr=float(lr) if lr is not None else 0.0,
+                    use_cache=use_cache,
+                )
                 if global_step % config.train.log_interval == 0:
                     lr = optim_g.param_groups[0]["lr"]
                     # Amor For Tensorboard display
@@ -722,15 +729,6 @@ def training_runner(
                 embedder_out_channels,
                 os.path.join(training_dir, "checkpoints", f"{model_name}-{epoch}.pth"),
                 epoch,
-            )
-
-        if is_main_process:
-            progress_bar.set_postfix(
-                epoch=epoch,
-                loss_g=float(loss_gen_all),
-                loss_d=float(loss_disc),
-                lr=float(lr),
-                use_cache=use_cache,
             )
 
         scheduler_g.step()

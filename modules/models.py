@@ -141,8 +141,8 @@ class VC_MODEL:
             sample_width=2,
             channels=1,
         )
-        index = os.listdir(AUDIO_OUT_DIR)
         os.makedirs(AUDIO_OUT_DIR, exist_ok=True)
+        index = os.listdir(AUDIO_OUT_DIR)
         audio.export(
             os.path.join(AUDIO_OUT_DIR, f"{len(index)+1}-output.wav"), format="wav"
         )
