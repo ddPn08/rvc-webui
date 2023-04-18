@@ -12,7 +12,10 @@ import torch.nn.functional as F
 
 from modules.shared import is_half
 
-if is_half == True:
+
+bh, ah = signal.butter(N=5, Wn=48, btype="high", fs=16000)
+
+if is_half:
     # 6G显存配置
     x_pad = 3
     x_query = 10
@@ -113,7 +116,7 @@ class VC(object):
         embedder_name,
     ):  # ,file_index,file_big_npy
         feats = torch.from_numpy(audio0)
-        if self.is_half == True:
+        if self.is_half:
             feats = feats.half()
         else:
             feats = feats.float()
@@ -122,18 +125,22 @@ class VC(object):
         assert feats.dim() == 1, feats.dim()
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
-        
+
         is_feats_dim_768 = embedder_name.endswith("768")
 
-        inputs = {
-            "source": feats.to(self.device),
-            "padding_mask": padding_mask,
-            "output_layer": 9,  # layer 9
-        } if not is_feats_dim_768 else {
-            "source": feats.to(self.device),
-            "padding_mask": padding_mask,
-            # no pass "output_layer"
-        }
+        inputs = (
+            {
+                "source": feats.to(self.device),
+                "padding_mask": padding_mask,
+                "output_layer": 9,  # layer 9
+            }
+            if not is_feats_dim_768
+            else {
+                "source": feats.to(self.device),
+                "padding_mask": padding_mask,
+                # no pass "output_layer"
+            }
+        )
         t0 = ttime()
         with torch.no_grad():
             logits = model.extract_features(**inputs)
@@ -148,11 +155,11 @@ class VC(object):
             and index_rate != 0
         ):
             npy = feats[0].cpu().numpy()
-            if self.is_half == True:
+            if self.is_half:
                 npy = npy.astype("float32")
             D, I = index.search(npy, 1)
             npy = big_npy[I.squeeze()]
-            if self.is_half == True:
+            if self.is_half:
                 npy = npy.astype("float16")
             feats = (
                 torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate
@@ -212,8 +219,8 @@ class VC(object):
         if (
             file_big_npy != ""
             and file_index != ""
-            and os.path.exists(file_big_npy) == True
-            and os.path.exists(file_index) == True
+            and os.path.exists(file_big_npy)
+            and os.path.exists(file_index)
             and index_rate != 0
         ):
             try:
@@ -224,6 +231,7 @@ class VC(object):
                 index = big_npy = None
         else:
             index = big_npy = None
+        audio = signal.filtfilt(bh, ah, audio)
         audio_pad = np.pad(audio, (self.window // 2, self.window // 2), mode="reflect")
         opt_ts = []
         if audio_pad.shape[0] > self.t_max:
@@ -246,7 +254,7 @@ class VC(object):
         audio_pad = np.pad(audio, (self.t_pad, self.t_pad), mode="reflect")
         p_len = audio_pad.shape[0] // self.window
         inp_f0 = None
-        if hasattr(f0_file, "name") == True:
+        if hasattr(f0_file, "name"):
             try:
                 with open(f0_file.name, "r") as f:
                     lines = f.read().strip("\n").split("\n")
