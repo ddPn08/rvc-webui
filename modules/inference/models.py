@@ -17,6 +17,7 @@ class TextEncoder256(nn.Module):
         out_channels,
         hidden_channels,
         filter_channels,
+        emb_channels,
         n_heads,
         n_layers,
         kernel_size,
@@ -27,11 +28,12 @@ class TextEncoder256(nn.Module):
         self.out_channels = out_channels
         self.hidden_channels = hidden_channels
         self.filter_channels = filter_channels
+        self.emb_channels = emb_channels
         self.n_heads = n_heads
         self.n_layers = n_layers
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
+        self.emb_phone = nn.Linear(emb_channels, hidden_channels)
         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
         if f0 == True:
             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
@@ -64,6 +66,7 @@ class TextEncoder256Sim(nn.Module):
         out_channels,
         hidden_channels,
         filter_channels,
+        emb_channels,
         n_heads,
         n_layers,
         kernel_size,
@@ -74,11 +77,12 @@ class TextEncoder256Sim(nn.Module):
         self.out_channels = out_channels
         self.hidden_channels = hidden_channels
         self.filter_channels = filter_channels
+        self.emb_channels = emb_channels
         self.n_heads = n_heads
         self.n_layers = n_layers
         self.kernel_size = kernel_size
         self.p_dropout = p_dropout
-        self.emb_phone = nn.Linear(256, hidden_channels)
+        self.emb_phone = nn.Linear(emb_channels, hidden_channels)
         self.lrelu = nn.LeakyReLU(0.1, inplace=True)
         if f0 == True:
             self.emb_pitch = nn.Embedding(256, hidden_channels)  # pitch 256
@@ -544,6 +548,7 @@ class SynthesizerTrnMs256NSFSid(nn.Module):
         upsample_kernel_sizes,
         spk_embed_dim,
         gin_channels,
+        emb_channels,
         sr,
         **kwargs
     ):
@@ -566,12 +571,14 @@ class SynthesizerTrnMs256NSFSid(nn.Module):
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
         self.gin_channels = gin_channels
+        self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
         self.enc_p = TextEncoder256(
             inter_channels,
             hidden_channels,
             filter_channels,
+            emb_channels,
             n_heads,
             n_layers,
             kernel_size,
@@ -655,6 +662,7 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
         upsample_kernel_sizes,
         spk_embed_dim,
         gin_channels,
+        emb_channels,
         sr=None,
         **kwargs
     ):
@@ -675,12 +683,14 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
         self.gin_channels = gin_channels
+        self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
         self.enc_p = TextEncoder256(
             inter_channels,
             hidden_channels,
             filter_channels,
+            emb_channels,
             n_heads,
             n_layers,
             kernel_size,
@@ -761,6 +771,7 @@ class SynthesizerTrnMs256NSFSidSim(nn.Module):
         upsample_kernel_sizes,
         spk_embed_dim,
         # hop_length,
+        emb_channels,
         gin_channels=0,
         use_sdp=True,
         **kwargs
@@ -782,12 +793,14 @@ class SynthesizerTrnMs256NSFSidSim(nn.Module):
         self.upsample_kernel_sizes = upsample_kernel_sizes
         self.segment_size = segment_size
         self.gin_channels = gin_channels
+        self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
         self.enc_p = TextEncoder256Sim(
             inter_channels,
             hidden_channels,
             filter_channels,
+            emb_channels,
             n_heads,
             n_layers,
             kernel_size,

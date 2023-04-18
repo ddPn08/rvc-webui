@@ -34,11 +34,17 @@ class Training(Tab):
         def train_index_only(
             model_name,
             target_sr,
+            f0,
             dataset_glob,
+            speaker_id,
             num_cpu_process,
+            norm_audio_when_preprocess,
             pitch_extraction_algo,
+            embedder_name,
             ignore_cache,
         ):
+            f0 = f0 == "Yes"
+            norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             yield f"Training directory: {training_dir}"
 
@@ -47,23 +53,24 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
-            datasets = glob_dataset(dataset_glob)
+            datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
             )
-
-            yield "Extracting f0..."
-            extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+            
+            if f0:
+                yield "Extracting f0..."
+                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir)
+            extract_feature(training_dir, embedder_name)
 
             yield "Training index..."
-            train_index(training_dir, model_name)
+            train_index(training_dir, model_name, 256 if not embedder_name.endswith("768") else 768)
 
-            return "Training complete"
+            yield "Training complete"
 
         def train_all(
             model_name,
@@ -73,6 +80,7 @@ class Training(Tab):
             speaker_id,
             gpu_id,
             num_cpu_process,
+            norm_audio_when_preprocess,
             pitch_extraction_algo,
             batch_size,
             cache_batch,
@@ -80,9 +88,11 @@ class Training(Tab):
             save_every_epoch,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
+            embedder_name,
             ignore_cache,
         ):
             f0 = f0 == "Yes"
+            norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             yield f"Training directory: {training_dir}"
 
@@ -91,11 +101,11 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
-            datasets = glob_dataset(dataset_glob)
+            datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
             preprocess_dataset(
-                datasets, SR_DICT[target_sr], num_cpu_process, training_dir
+                datasets, SR_DICT[target_sr], num_cpu_process, training_dir, norm_audio_when_preprocess
             )
 
             if f0:
@@ -103,11 +113,13 @@ class Training(Tab):
                 extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir)
+            extract_feature(training_dir, embedder_name)
 
-            create_dataset_meta(training_dir, target_sr, f0, speaker_id)
+            create_dataset_meta(training_dir, target_sr, f0)
 
             yield "Training model..."
+            
+            print(f"train_all: emb_name: {embedder_name}")
 
             train_model(
                 gpu_id.split(","),
@@ -121,6 +133,7 @@ class Training(Tab):
                 save_every_epoch,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
+                embedder_name,
             )
 
             yield "Training index..."
@@ -128,9 +141,10 @@ class Training(Tab):
             train_index(
                 training_dir,
                 model_name,
+                256 if not embedder_name.endswith("768") else 768,
             )
 
-            return "Training completed"
+            yield "Training completed"
 
         with gr.Group():
             with gr.Box():
@@ -155,6 +169,16 @@ class Training(Tab):
                         )
                         speaker_id = gr.Slider(
                             maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
+                        )
+                        embedder_name = gr.Radio(
+                            choices=["hubert_base", "contentvec", "hubert_base768", "contentvec768"],
+                            value="hubert_base",
+                            label="Using phone embedder",
+                        )
+                        norm_audio_when_preprocess = gr.Radio(
+                            choices=["Yes", "No"],
+                            value="Yes",
+                            label="Normalize audio volume when preprocess"
                         )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
@@ -213,9 +237,13 @@ class Training(Tab):
             inputs=[
                 model_name,
                 target_sr,
+                f0,
                 dataset_glob,
+                speaker_id,
                 num_cpu_process,
+                norm_audio_when_preprocess,
                 pitch_extraction_algo,
+                embedder_name,
                 ignore_cache,
             ],
             outputs=[status],
@@ -231,6 +259,7 @@ class Training(Tab):
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
+                norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 batch_size,
                 cache_batch,
@@ -238,6 +267,7 @@ class Training(Tab):
                 save_every_epoch,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
+                embedder_name,
                 ignore_cache,
             ],
             outputs=[status],

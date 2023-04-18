@@ -10,7 +10,7 @@ def write_config(state_dict: Dict[str, Any], cfg: Dict[str, Any]):
     state_dict["params"] = cfg
 
 
-def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, epoch: int):
+def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, emb_name: str, emb_ch: int, epoch: int):
     state_dict = OrderedDict()
     state_dict["weight"] = {}
     for key in weights.keys():
@@ -38,6 +38,7 @@ def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, epoch: int):
                 "upsample_kernel_sizes": [16, 16, 4, 4],
                 "spk_embed_dim": 109,
                 "gin_channels": 256,
+                "emb_channels": emb_ch,
                 "sr": 40000,
             },
         )
@@ -62,6 +63,7 @@ def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, epoch: int):
                 "upsample_kernel_sizes": [16, 16, 4, 4, 4],
                 "spk_embed_dim": 109,
                 "gin_channels": 256,
+                "emb_channels": emb_ch,
                 "sr": 48000,
             },
         )
@@ -86,21 +88,25 @@ def create_trained_model(weights: Dict[str, Any], sr: int, f0: int, epoch: int):
                 "upsample_kernel_sizes": [16, 16, 4, 4, 4],
                 "spk_embed_dim": 109,
                 "gin_channels": 256,
+                "emb_channels": emb_ch,
                 "sr": 32000,
             },
         )
     state_dict["info"] = f"{epoch}epoch"
     state_dict["sr"] = sr
     state_dict["f0"] = int(f0)
+    state_dict["embedder_name"] = emb_name
     return state_dict
 
 
-def save(model, sr: int, f0: int, filepath: str, epoch: int):
+def save(model, sr: int, f0: int, emb_name: str, emb_ch: int, filepath: str, epoch: int):
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
     else:
         state_dict = model.state_dict()
+        
+    print(f"save: emb_name: {emb_name} {emb_ch}")
 
-    state_dict = create_trained_model(state_dict, sr, f0, epoch)
+    state_dict = create_trained_model(state_dict, sr, f0, emb_name, emb_ch, epoch)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     torch.save(state_dict, filepath)

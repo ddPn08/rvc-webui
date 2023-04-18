@@ -124,14 +124,21 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
 
     os.makedirs(opt_dir_f0, exist_ok=True)
     os.makedirs(opt_dir_f0_nsf, exist_ok=True)
-
-    for name in sorted(list(os.listdir(dataset_dir))):
+    
+    for name in [
+        os.path.join(dir, f) for dir in sorted(list(os.listdir(dataset_dir))) if os.path.isdir(os.path.join(dataset_dir, dir))
+        for f in sorted(list(os.listdir(os.path.join(dataset_dir, dir))))
+        ]:  # dataset_dir/{05d}/file.ext
         dir = os.path.join(dataset_dir, name)
         if "spec" in dir:
             continue
         opt_filepath_f0 = os.path.join(opt_dir_f0, name)
         opt_filepath_f0_nsf = os.path.join(opt_dir_f0_nsf, name)
         paths.append([dir, opt_filepath_f0, opt_filepath_f0_nsf])
+        
+    for dir in set([(os.path.dirname(p[1]), os.path.dirname(p[2])) for p in paths]):
+        os.makedirs(dir[0], exist_ok=True)
+        os.makedirs(dir[1], exist_ok=True)
 
     ps = []
     for i in range(num_processes):
@@ -148,7 +155,23 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
         p.join()
 
 
-def extract_feature(training_dir: str):
+def load_embedder(emb_file):
+    models, cfg, _ = checkpoint_utils.load_model_ensemble_and_task(
+        [os.path.join(MODELS_DIR, emb_file)],
+        suffix="",
+    )
+    embedder_model = models[0]
+    embedder_model = embedder_model.to(device)
+    if device != "cpu":
+        embedder_model = embedder_model.half()
+    else:
+        embedder_model = embedder_model.float()
+    embedder_model.eval()
+    
+    return embedder_model, cfg
+
+
+def extract_feature(training_dir: str, embedder_name: str):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
 
@@ -171,16 +194,28 @@ def extract_feature(training_dir: str):
         feats = feats.view(1, -1)
         return feats
 
-    # HuBERT model
-    models, cfg, _ = checkpoint_utils.load_model_ensemble_and_task(
-        [os.path.join(MODELS_DIR, "hubert_base.pt")],
-        suffix="",
-    )
-    model = models[0]
-    model = model.to(device)
-    if device != "cpu":
-        model = model.half()
-    model.eval()
+    # # HuBERT model
+    # models, cfg, _ = checkpoint_utils.load_model_ensemble_and_task(
+    #     [os.path.join(MODELS_DIR, "hubert_base.pt")],
+    #     suffix="",
+    # )
+    # model = models[0]
+    # model = model.to(device)
+    # if device != "cpu":
+    #     model = model.half()
+    # model.eval()
+    
+    load_emb_dic = {
+        "hubert_base": ("hubert_base.pt", "hubert_base"),
+        "hubert_base768": ("hubert_base.pt", "hubert_base"),
+        "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
+        "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
+    }
+    if not embedder_name in load_emb_dic:
+        return f"Not supported embedder: {embedder_name}"
+    model, cfg = load_embedder(load_emb_dic[embedder_name][0])
+    
+    is_feats_dim_768 = embedder_name.endswith("768")
 
     num_gpus = torch.cuda.device_count()
 
@@ -193,6 +228,8 @@ def extract_feature(training_dir: str):
 
                     if os.path.exists(out_filepath):
                         continue
+                    
+                    os.makedirs(os.path.dirname(out_filepath), exist_ok=True)
 
                     feats = readwave(wav_filepath, normalize=cfg.task.normalize)
                     padding_mask = torch.BoolTensor(feats.shape).fill_(False)
@@ -202,10 +239,19 @@ def extract_feature(training_dir: str):
                         else feats.to(device),
                         "padding_mask": padding_mask.to(device),
                         "output_layer": 9,  # layer 9
+                    } if not is_feats_dim_768 else {
+                        "source": feats.half().to(device)
+                        if device != "cpu"
+                        else feats.to(device),
+                        "padding_mask": padding_mask.to(device),
+                        # no pass "output_layer"
                     }
                     with torch.no_grad():
                         logits = model.extract_features(**inputs)
-                        feats = model.final_proj(logits[0])
+                        if is_feats_dim_768:
+                            feats = logits[0]
+                        else:
+                            feats = model.final_proj(logits[0])
 
                     feats = feats.squeeze(0).float().cpu().numpy()
                     if np.isnan(feats).sum() == 0:
@@ -217,7 +263,10 @@ def extract_feature(training_dir: str):
                 traceback.print_exc()
 
     async def run_tasks():
-        todo = sorted(list(os.listdir(wav_dir)))
+        todo = [
+            os.path.join(dir, f) for dir in sorted(list(os.listdir(wav_dir))) if os.path.isdir(os.path.join(wav_dir, dir))
+            for f in sorted(list(os.listdir(os.path.join(wav_dir, dir))))
+        ]
         loop = asyncio.get_event_loop()
         await asyncio.gather(
             *[

@@ -110,6 +110,7 @@ class VC(object):
         index,
         big_npy,
         index_rate,
+        embedder_name,
     ):  # ,file_index,file_big_npy
         feats = torch.from_numpy(audio0)
         if self.is_half == True:
@@ -121,16 +122,25 @@ class VC(object):
         assert feats.dim() == 1, feats.dim()
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
+        
+        is_feats_dim_768 = embedder_name.endswith("768")
 
         inputs = {
             "source": feats.to(self.device),
             "padding_mask": padding_mask,
             "output_layer": 9,  # layer 9
+        } if not is_feats_dim_768 else {
+            "source": feats.to(self.device),
+            "padding_mask": padding_mask,
+            # no pass "output_layer"
         }
         t0 = ttime()
         with torch.no_grad():
             logits = model.extract_features(**inputs)
-            feats = model.final_proj(logits[0])
+            if is_feats_dim_768:
+                feats = logits[0]
+            else:
+                feats = model.final_proj(logits[0])
 
         if (
             isinstance(index, type(None)) == False
@@ -197,6 +207,7 @@ class VC(object):
         index_rate,
         if_f0,
         f0_file=None,
+        embedder_name="hubert_base",
     ):
         if (
             file_big_npy != ""
@@ -270,6 +281,7 @@ class VC(object):
                         index,
                         big_npy,
                         index_rate,
+                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             else:
@@ -285,6 +297,7 @@ class VC(object):
                         index,
                         big_npy,
                         index_rate,
+                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             s = t
@@ -301,6 +314,7 @@ class VC(object):
                     index,
                     big_npy,
                     index_rate,
+                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         else:
@@ -316,6 +330,7 @@ class VC(object):
                     index,
                     big_npy,
                     index_rate,
+                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         audio_opt = np.concatenate(audio_opt)
