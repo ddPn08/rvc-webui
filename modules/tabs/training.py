@@ -98,7 +98,10 @@ class Training(Tab):
             pre_trained_bottom_model_d,
             embedder_name,
             ignore_cache,
+            vc_client_compatible,
         ):
+            if embedder_name.endswith("768") and vc_client_compatible:
+                yield "Error: 768 dim embedder is not compatible with VC client"
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
@@ -146,6 +149,7 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
+                vc_client_compatible=vc_client_compatible,
             )
 
             yield "Training index..."
@@ -164,6 +168,14 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         model_name = gr.Textbox(label="Model Name")
                         ignore_cache = gr.Checkbox(label="Ignore cache")
+                        dataset_glob = gr.Textbox(
+                            label="Dataset glob", placeholder="data/**/*.wav"
+                        )
+                        speaker_id = gr.Slider(
+                            maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
+                        )
+
+                    with gr.Row().style(equal_height=False):
                         target_sr = gr.Radio(
                             choices=["32k", "40k", "48k"],
                             value="40k",
@@ -173,14 +185,6 @@ class Training(Tab):
                             choices=["Yes", "No"],
                             value="Yes",
                             label="f0 Model",
-                        )
-
-                    with gr.Row().style(equal_height=False):
-                        dataset_glob = gr.Textbox(
-                            label="Dataset glob", placeholder="data/**/*.wav"
-                        )
-                        speaker_id = gr.Slider(
-                            maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
                         )
                         embedder_name = gr.Radio(
                             choices=[
@@ -197,6 +201,7 @@ class Training(Tab):
                             value="Yes",
                             label="Normalize audio volume when preprocess",
                         )
+                        vc_client_compatible = gr.Checkbox(label="VC Client compatible")
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",
@@ -284,6 +289,7 @@ class Training(Tab):
                 pre_trained_bottom_model_d,
                 embedder_name,
                 ignore_cache,
+                vc_client_compatible,
             ],
             outputs=[status],
         )
