@@ -201,7 +201,7 @@ class Training(Tab):
                             value="Yes",
                             label="Normalize audio volume when preprocess",
                         )
-                        vc_client_compatible = gr.Checkbox(label="VC Client compatible")
+                        vc_client_compatible = gr.Checkbox(label="VC Client compatible", value=True)
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",
