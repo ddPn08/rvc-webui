@@ -298,7 +298,8 @@ def training_runner(
     embedder_name: str,
     save_only_last: bool = False,
 ):
-    config.train.batch_size = int(batch_size)
+    batch_size = int(batch_size)
+    config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
     state_dir = os.path.join(training_dir, "state")
     training_files_path = os.path.join(training_dir, "meta.json")
