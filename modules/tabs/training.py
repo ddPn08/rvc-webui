@@ -215,9 +215,7 @@ class Training(Tab):
                             label="Pitch extraction algorithm",
                         )
                     with gr.Row().style(equal_height=False):
-                        batch_size = gr.Slider(
-                            minimum=1, maximum=64, value=4, step=1, label="Batch size"
-                        )
+                        batch_size = gr.Number(value=4, step=1, label="Batch size")
                         num_epochs = gr.Slider(
                             minimum=1,
                             maximum=1000,
