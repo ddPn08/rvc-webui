@@ -47,18 +47,20 @@ class PreProcess:
             tmp_audio = (
                 tmp_audio / np.abs(tmp_audio).max() * (self.max * self.alpha)
             ) + (1 - self.alpha) * tmp_audio
+
         wavfile.write(
             os.path.join(self.gt_wavs_dir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
             self.sr,
-            (tmp_audio * 32768).astype(np.int16),
+            tmp_audio.astype(np.float32),
         )
+
         tmp_audio = librosa.resample(
             tmp_audio, orig_sr=self.sr, target_sr=16000, res_type="soxr_vhq"
         )
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
             16000,
-            (tmp_audio * 32768).astype(np.int16),
+            tmp_audio.astype(np.float32),
         )
 
     def write_mute(self, mute_wave_filename, speaker_id):
@@ -66,7 +68,7 @@ class PreProcess:
         wavfile.write(
             os.path.join(self.gt_wavs_dir, f"{speaker_id:05}", "mute.wav"),
             self.sr,
-            (tmp_audio * 32768).astype(np.int16),
+            tmp_audio.astype(np.float32),
         )
         tmp_audio = librosa.resample(
             tmp_audio, orig_sr=self.sr, target_sr=16000, res_type="soxr_vhq"
@@ -74,7 +76,7 @@ class PreProcess:
         wavfile.write(
             os.path.join(self.wavs16k_dir, f"{speaker_id:05}", "mute.wav"),
             16000,
-            (tmp_audio * 32768).astype(np.int16),
+            tmp_audio.astype(np.float32),
         )
 
     def pipeline(self, speaker_id: int, path: str, index: int, is_normalize: bool):
