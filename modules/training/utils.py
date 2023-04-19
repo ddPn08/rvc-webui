@@ -9,6 +9,7 @@ import matplotlib.pylab as plt
 import numpy as np
 import torch
 from scipy.io.wavfile import read
+from torch.nn import functional as F
 
 from modules.shared import ROOT_DIR
 
@@ -38,10 +39,44 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
                 print(
                     f"shape-{k}-mismatch|need-{state_dict[k].shape}|get-{saved_state_dict[k].shape}"
                 )
-                raise KeyError
-        except:
+                if saved_state_dict[k].dim() == 2:  # NOTE: check is this ok?
+                    # for embedded input 256 <==> 768
+                    # this achieves we can continue training from original's pretrained checkpoints when using embedder that 768-th dim output etc.
+                    if saved_state_dict[k].dtype == torch.half:
+                        new_state_dict[k] = (
+                            F.interpolate(
+                                saved_state_dict[k].float().unsqueeze(0).unsqueeze(0),
+                                size=state_dict[k].shape,
+                                mode="bilinear",
+                            )
+                            .half()
+                            .squeeze(0)
+                            .squeeze(0)
+                        )
+                    else:
+                        new_state_dict[k] = (
+                            F.interpolate(
+                                saved_state_dict[k].unsqueeze(0).unsqueeze(0),
+                                size=state_dict[k].shape,
+                                mode="bilinear",
+                            )
+                            .squeeze(0)
+                            .squeeze(0)
+                        )
+                    print(
+                        "interpolated new_state_dict",
+                        k,
+                        "from",
+                        saved_state_dict[k].shape,
+                        "to",
+                        new_state_dict[k].shape,
+                    )
+                else:
+                    raise KeyError
+        except Exception as e:
             # print(traceback.format_exc())
             print(f"{k} is not in the checkpoint")
+            print("error: %s" % e)
             new_state_dict[k] = v  # 模型自带的随机值
     if hasattr(model, "module"):
         model.module.load_state_dict(new_state_dict, strict=False)
@@ -146,8 +181,13 @@ def load_wav_to_torch(full_path):
     return torch.FloatTensor(data.astype(np.float32)), sampling_rate
 
 
-def load_config(training_dir: str, sample_rate: int):
-    config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
+def load_config(training_dir: str, sample_rate: int, emb_channels: int):
+    if emb_channels == 256:
+        config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
+    else:
+        config_path = os.path.join(
+            ROOT_DIR, "configs", f"{sample_rate}-{emb_channels}.json"
+        )
     config_save_path = os.path.join(training_dir, "config.json")
 
     shutil.copyfile(config_path, config_save_path)

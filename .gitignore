@@ -5,3 +5,4 @@ venv/
 tmp/
 
 models/hubert_base.pt
+models/checkpoint_best_legacy_500.pt

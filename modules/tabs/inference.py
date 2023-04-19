@@ -66,6 +66,7 @@ class Inference(Tab):
         ):
             model = models.vc_model
             try:
+                yield "Infering...", None
                 audio = model.single(
                     sid,
                     input_audio,
@@ -77,9 +78,9 @@ class Inference(Tab):
                     big_npy_file,
                     index_rate,
                 )
-                return "Success", (model.tgt_sr, audio)
+                yield "Success", (model.tgt_sr, audio)
             except:
-                return "Error: " + traceback.format_exc(), None
+                yield "Error: " + traceback.format_exc(), None
 
         with gr.Group():
             with gr.Box():
