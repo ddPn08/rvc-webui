@@ -9,36 +9,22 @@ import scipy.signal as signal
 import torch
 import torch.nn.functional as F
 
-from modules.shared import is_half
 
-if is_half:
-    # 6G显存配置
-    x_pad = 3
-    x_query = 10
-    x_center = 60
-    x_max = 65
-else:
-    # 5G显存配置
-    x_pad = 1
-    # x_query     =   6
-    # x_center    =   30
-    # x_max       =   32
-    # 6G显存配置
-    x_query = 6
-    x_center = 38
-    x_max = 41
-
-
-class VC(object):
+class VocalConvertPipeline(object):
     def __init__(self, tgt_sr, device, is_half):
-        self.sr = 16000  # hubert输入采样率
-        self.window = 160  # 每帧点数
-        self.t_pad = self.sr * x_pad  # 每条前后pad时间
-        self.t_pad_tgt = tgt_sr * x_pad
+        self.x_pad = 3 if is_half else 1
+        self.x_query = 10 if is_half else 6
+        self.x_center = 60 if is_half else 30
+        self.x_max = 65 if is_half else 32
+
+        self.sr = 16000  # hubert input sample rate
+        self.window = 160  # hubert input window
+        self.t_pad = self.sr * self.x_pad  # padding time for each utterance
+        self.t_pad_tgt = tgt_sr * self.x_pad
         self.t_pad2 = self.t_pad * 2
-        self.t_query = self.sr * x_query  # 查询切点前后查询时间
-        self.t_center = self.sr * x_center  # 查询切点位置
-        self.t_max = self.sr * x_max  # 免查询时长阈值
+        self.t_query = self.sr * self.x_query  # query time before and after query point
+        self.t_center = self.sr * self.x_query  # query cut point position
+        self.t_max = self.sr * self.x_max  # max time for no query
         self.device = device
         self.is_half = is_half
 
@@ -75,8 +61,7 @@ class VC(object):
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
             f0 = signal.medfilt(f0, 3)
         f0 *= pow(2, f0_up_key / 12)
-        # with open("test.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
-        tf0 = self.sr // self.window  # 每秒f0点数
+        tf0 = self.sr // self.window  # f0 points per second
         if inp_f0 is not None:
             delta_t = np.round(
                 (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
@@ -84,9 +69,11 @@ class VC(object):
             replace_f0 = np.interp(
                 list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
             )
-            shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
-            f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
-        # with open("test_opt.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
+            shape = f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)].shape[0]
+            f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[
+                :shape
+            ]
+
         f0bak = f0.copy()
         f0_mel = 1127 * np.log(1 + f0 / 700)
         f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
@@ -97,7 +84,7 @@ class VC(object):
         f0_coarse = np.rint(f0_mel).astype(np.int)
         return f0_coarse, f0bak  # 1-0
 
-    def vc(
+    def _convert(
         self,
         model,
         net_g,
@@ -109,7 +96,7 @@ class VC(object):
         big_npy,
         index_rate,
         embedder_name,
-    ):  # ,file_index,file_big_npy
+    ):
         feats = torch.from_numpy(audio)
         if self.is_half:
             feats = feats.half()
@@ -274,7 +261,7 @@ class VC(object):
             t = t // self.window * self.window
             if if_f0 == 1:
                 audio_opt.append(
-                    self.vc(
+                    self._convert(
                         model,
                         net_g,
                         sid,
@@ -289,7 +276,7 @@ class VC(object):
                 )
             else:
                 audio_opt.append(
-                    self.vc(
+                    self._convert(
                         model,
                         net_g,
                         sid,
@@ -305,7 +292,7 @@ class VC(object):
             s = t
         if if_f0 == 1:
             audio_opt.append(
-                self.vc(
+                self._convert(
                     model,
                     net_g,
                     sid,
@@ -320,7 +307,7 @@ class VC(object):
             )
         else:
             audio_opt.append(
-                self.vc(
+                self._convert(
                     model,
                     net_g,
                     sid,

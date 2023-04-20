@@ -4,16 +4,10 @@ from multiprocessing import cpu_count
 
 import gradio as gr
 
-from modules import utils
-from modules.shared import MODELS_DIR
-from modules.training.extract import extract_f0, extract_feature
-from modules.training.preprocess import preprocess_dataset
-from modules.training.train import (
-    create_dataset_meta,
-    glob_dataset,
-    train_index,
-    train_model,
-)
+from lib.rvc.preprocessing import extract_f0, extract_feature, split
+from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from modules import models, utils
+from modules.shared import MODELS_DIR, device
 from modules.ui import Tab
 
 SR_DICT = {
@@ -56,7 +50,7 @@ class Training(Tab):
             datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
-            preprocess_dataset(
+            split.preprocess_audio(
                 datasets,
                 SR_DICT[target_sr],
                 num_cpu_process,
@@ -66,15 +60,27 @@ class Training(Tab):
 
             if f0:
                 yield "Extracting f0..."
-                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+                extract_f0.run(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir, embedder_name)
+
+            embedder_filepath, _ = models.get_embedder(embedder_name)
+
+            extract_feature.run(
+                training_dir,
+                embedder_filepath,
+                embedder_name.endswith("768"),
+                None,
+                device,
+            )
+
+            out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
             yield "Training index..."
             train_index(
                 training_dir,
                 model_name,
+                out_dir,
                 256 if not embedder_name.endswith("768") else 768,
             )
 
@@ -82,7 +88,7 @@ class Training(Tab):
 
         def train_all(
             model_name,
-            target_sr,
+            sampling_rate_str,
             f0,
             dataset_glob,
             speaker_id,
@@ -105,6 +111,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
             yield f"Training directory: {training_dir}"
 
             if os.path.exists(training_dir) and ignore_cache:
@@ -115,9 +122,9 @@ class Training(Tab):
             datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
-            preprocess_dataset(
+            split.preprocess_audio(
                 datasets,
-                SR_DICT[target_sr],
+                SR_DICT[sampling_rate_str],
                 num_cpu_process,
                 training_dir,
                 norm_audio_when_preprocess,
@@ -125,22 +132,39 @@ class Training(Tab):
 
             if f0:
                 yield "Extracting f0..."
-                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+                extract_f0.run(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir, embedder_name)
 
-            create_dataset_meta(training_dir, target_sr, f0)
+            embedder_filepath, _ = models.get_embedder(embedder_name)
+
+            extract_feature.run(
+                training_dir,
+                os.path.join(MODELS_DIR, embedder_filepath),
+                embedder_name.endswith("768"),
+                gpu_ids,
+            )
+
+            create_dataset_meta(training_dir, sampling_rate_str, f0)
 
             yield "Training model..."
 
             print(f"train_all: emb_name: {embedder_name}")
 
+            config = utils.load_config(
+                training_dir,
+                sampling_rate_str,
+                768 if embedder_name.endswith("768") else 256,
+            )
+            out_dir = os.path.join(MODELS_DIR, "checkpoints")
+
             train_model(
-                gpu_id.split(","),
+                gpu_ids,
+                config,
                 training_dir,
                 model_name,
-                target_sr,
+                out_dir,
+                sampling_rate_str,
                 1 if f0 else 0,
                 batch_size,
                 cache_batch,
@@ -157,6 +181,7 @@ class Training(Tab):
             train_index(
                 training_dir,
                 model_name,
+                out_dir,
                 256 if not embedder_name.endswith("768") else 768,
             )
 
@@ -201,7 +226,9 @@ class Training(Tab):
                             value="Yes",
                             label="Normalize audio volume when preprocess",
                         )
-                        vc_client_compatible = gr.Checkbox(label="VC Client compatible", value=True)
+                        vc_client_compatible = gr.Checkbox(
+                            label="VC Client compatible", value=True
+                        )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",

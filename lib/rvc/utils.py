@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import shutil
+import socket
 import sys
 
 import matplotlib
@@ -20,6 +21,15 @@ logging.getLogger("matplotlib").setLevel(logging.WARNING)
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging
+
+
+def find_empty_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    s.listen(1)
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 
 def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):

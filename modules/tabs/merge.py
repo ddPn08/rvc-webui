@@ -80,7 +80,7 @@ class Merge(Tab):
             merged = merge_ckpt(
                 model_a, model_b, model_c, weight_text, alpha, each_key, method
             )
-            model = models.VC_MODEL("merge", merged)
+            model = models.VoiceConvertModel("merge", merged)
             audio = model.single(
                 speaker_id,
                 source_audio,
@@ -116,7 +116,7 @@ class Merge(Tab):
                 os.path.join(models.MODELS_DIR, "checkpoints", model),
                 map_location="cpu",
             )
-            vc_model = models.VC_MODEL("merge", model)
+            vc_model = models.VoiceConvertModel("merge", model)
             max = vc_model.n_spk
             del model
             del vc_model

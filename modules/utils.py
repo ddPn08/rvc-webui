@@ -1,9 +1,13 @@
-import socket
+import os
+import shutil
 
 import ffmpeg
 import numpy as np
 import requests
 import torch
+
+from lib.rvc.config import TrainConfig
+from modules.shared import ROOT_DIR
 
 
 def load_audio(file: str, sr):
@@ -36,10 +40,15 @@ def donwload_file(url, out):
         f.write(req.content)
 
 
-def find_empty_port():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("", 0))
-    s.listen(1)
-    port = s.getsockname()[1]
-    s.close()
-    return port
+def load_config(training_dir: str, sample_rate: str, emb_channels: int):
+    if emb_channels == 256:
+        config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
+    else:
+        config_path = os.path.join(
+            ROOT_DIR, "configs", f"{sample_rate}-{emb_channels}.json"
+        )
+    config_save_path = os.path.join(training_dir, "config.json")
+
+    shutil.copyfile(config_path, config_save_path)
+
+    return TrainConfig.parse_file(config_save_path)

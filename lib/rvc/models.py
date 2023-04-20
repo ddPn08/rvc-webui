@@ -11,18 +11,18 @@ from . import attentions, commons, modules
 from .commons import get_padding, init_weights
 
 
-class TextEncoder256(nn.Module):
+class TextEncoder(nn.Module):
     def __init__(
         self,
-        out_channels,
-        hidden_channels,
-        filter_channels,
-        emb_channels,
-        n_heads,
-        n_layers,
-        kernel_size,
-        p_dropout,
-        f0=True,
+        out_channels: int,
+        hidden_channels: int,
+        filter_channels: int,
+        emb_channels: int,
+        n_heads: int,
+        n_layers: int,
+        kernel_size: int,
+        p_dropout: int,
+        f0: bool = True,
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -60,18 +60,18 @@ class TextEncoder256(nn.Module):
         return m, logs, x_mask
 
 
-class TextEncoder256Sim(nn.Module):
+class TextEncoderSim(nn.Module):
     def __init__(
         self,
-        out_channels,
-        hidden_channels,
-        filter_channels,
-        emb_channels,
-        n_heads,
-        n_layers,
-        kernel_size,
-        p_dropout,
-        f0=True,
+        out_channels: int,
+        hidden_channels: int,
+        filter_channels: int,
+        emb_channels: int,
+        n_heads: int,
+        n_layers: int,
+        kernel_size: int,
+        p_dropout: int,
+        f0: bool = True,
     ):
         super().__init__()
         self.out_channels = out_channels
@@ -574,7 +574,7 @@ class SynthesizerTrnMs256NSFSid(nn.Module):
         self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
-        self.enc_p = TextEncoder256(
+        self.enc_p = TextEncoder(
             inter_channels,
             hidden_channels,
             filter_channels,
@@ -686,7 +686,7 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
         self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
-        self.enc_p = TextEncoder256(
+        self.enc_p = TextEncoder(
             inter_channels,
             hidden_channels,
             filter_channels,
@@ -796,7 +796,7 @@ class SynthesizerTrnMs256NSFSidSim(nn.Module):
         self.emb_channels = emb_channels
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
-        self.enc_p = TextEncoder256Sim(
+        self.enc_p = TextEncoderSim(
             inter_channels,
             hidden_channels,
             filter_channels,
