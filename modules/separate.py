@@ -31,6 +31,8 @@ def separate_audio(
             audio = AudioSegment.from_mp3(file)
         elif os.path.splitext(file)[1] == ".wav":
             audio = AudioSegment.from_wav(file)
+        elif os.path.splitext(file)[1] == ".flac":
+            audio = AudioSegment.from_file(file, "flac")
         else:
             raise ValueError(
                 "Invalid file format. Only MP3 and WAV files are supported."
