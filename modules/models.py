@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import posixpath
 from typing import *
 from urllib.parse import urlparse
@@ -92,8 +93,8 @@ class VC_MODEL:
         big_npy_file: str,
         index_rate: float,
     ):
-        if input_audio is None:
-            raise Exception("You need to upload an audio")
+        if not input_audio:
+            raise Exception("You need to set Source Audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
 
@@ -142,11 +143,19 @@ class VC_MODEL:
             channels=1,
         )
         os.makedirs(AUDIO_OUT_DIR, exist_ok=True)
-        index = os.listdir(AUDIO_OUT_DIR)
+        input_audio_splitext = os.path.splitext(os.path.basename(input_audio))[0]
+        model_splitext = os.path.splitext(self.model_name)[0]
+        index = 0
+        existing_files = os.listdir(AUDIO_OUT_DIR)
+        for existing_file in existing_files:
+            result = re.match(r'\d+', existing_file)
+            if result:
+                prefix_num = int(result.group(0))
+                if index < prefix_num:
+                    index = prefix_num
         audio.export(
-            os.path.join(AUDIO_OUT_DIR, f"{len(index)+1}-output.wav"), format="wav"
+            os.path.join(AUDIO_OUT_DIR, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"), format="wav"
         )
-
         return audio_opt
 
     def get_big_npy_path(self, speaker_id: int):
