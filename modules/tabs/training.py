@@ -189,6 +189,7 @@ class Training(Tab):
                                 "hubert_base768",
                                 "contentvec768",
                                 "distilhubert768",
+                                "distilhubert-ja768",
                             ],
                             value="hubert_base",
                             label="Using phone embedder",

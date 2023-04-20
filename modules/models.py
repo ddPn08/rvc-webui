@@ -105,6 +105,7 @@ class VC_MODEL:
             "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
             "distilhubert": (load_transformers_hubert, "ntu-spml/distilhubert"),
             "distilhubert768": (load_transformers_hubert, "ntu-spml/distilhubert"),
+            "distilhubert-ja768": (load_transformers_hubert, "TylorShine/distilhubert-ft-japanese-50k"),
         }
         if not self.embedder_name in load_emb_dic.keys():
             raise Exception(f"Not supported embedder: {self.embedder_name}")
@@ -250,6 +251,22 @@ def load_transformers_hubert(repo_name, emb_name):
     embedder_model = (
         Wav2Vec2FeatureExtractor.from_pretrained(repo_name),
         HubertModel.from_pretrained(repo_name).to(device)
+    )
+    if is_half:
+        embedder_model[1].half()
+    else:
+        embedder_model[1].float()
+    embedder_model[1].eval()
+    
+    loaded_embedder_model = emb_name
+    
+    
+def load_transformers_hubert_local(dir_name, emb_name):
+    global embedder_model, loaded_embedder_model
+    dir_name = os.path.join(ROOT_DIR, "models", "pretrained", "feature_extractors", dir_name)
+    embedder_model = (
+        Wav2Vec2FeatureExtractor.from_pretrained(dir_name, local_files_only=True),
+        HubertModel.from_pretrained(dir_name, local_files_only=True).to(device)
     )
     if is_half:
         embedder_model[1].half()

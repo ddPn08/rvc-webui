@@ -15,7 +15,7 @@ from fairseq import checkpoint_utils
 from transformers import Wav2Vec2FeatureExtractor, HubertModel
 
 from modules.models import MODELS_DIR
-from modules.shared import device
+from modules.shared import ROOT_DIR, device
 
 
 class FeatureInput(object):
@@ -194,6 +194,21 @@ def load_transformers_hubert(repo_name):
     return embedder_model
 
 
+def load_transformers_hubert_local(dir_name):
+    dir_name = os.path.join(ROOT_DIR, "models", "pretrained", "feature_extractors", dir_name)
+    embedder_model = (
+        Wav2Vec2FeatureExtractor.from_pretrained(dir_name, local_files_only=True),
+        HubertModel.from_pretrained(dir_name, local_files_only=True).to(device)
+    )
+    if device != "cpu":
+        embedder_model[1].half()
+    else:
+        embedder_model[1].float()
+    embedder_model[1].eval()
+    
+    return embedder_model
+
+
 def extract_feature(training_dir: str, embedder_name: str):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
@@ -235,6 +250,7 @@ def extract_feature(training_dir: str, embedder_name: str):
         "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
         "distilhubert": (load_transformers_hubert, "ntu-spml/distilhubert"),
         "distilhubert768": (load_transformers_hubert, "ntu-spml/distilhubert"),
+        "distilhubert-ja768": (load_transformers_hubert, "TylorShine/distilhubert-ft-japanese-50k"),
     }
     if not embedder_name in load_emb_dic:
         return f"Not supported embedder: {embedder_name}"
