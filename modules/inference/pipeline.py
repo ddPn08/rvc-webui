@@ -120,29 +120,42 @@ class VC(object):
         assert feats.dim() == 1, feats.dim()
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
-
+        
         is_feats_dim_768 = embedder_name.endswith("768")
-
-        inputs = (
-            {
-                "source": feats.to(self.device),
-                "padding_mask": padding_mask,
-                "output_layer": 9,  # layer 9
-            }
-            if not is_feats_dim_768
-            else {
-                "source": feats.to(self.device),
-                "padding_mask": padding_mask,
-                # no pass "output_layer"
-            }
-        )
-
-        with torch.no_grad():
-            logits = model.extract_features(**inputs)
-            if is_feats_dim_768:
-                feats = logits[0]
+        
+        # if embedder_name.startswith("distilhubert"):
+        if isinstance(model, tuple):
+            feats = model[0](feats.squeeze(0).squeeze(0).to(self.device), return_tensors="pt", sampling_rate=16000)
+            if self.is_half:
+                feats = feats.input_values.to(self.device).half()
             else:
-                feats = model.final_proj(logits[0])
+                feats = feats.input_values.to(self.device)
+            with torch.no_grad():
+                if is_feats_dim_768:
+                    feats = model[1](feats).last_hidden_state
+                else:
+                    feats = model[1](feats).extract_features
+        else:
+            inputs = (
+                {
+                    "source": feats.to(self.device),
+                    "padding_mask": padding_mask,
+                    "output_layer": 9,  # layer 9
+                }
+                if not is_feats_dim_768
+                else {
+                    "source": feats.to(self.device),
+                    "padding_mask": padding_mask,
+                    # no pass "output_layer"
+                }
+            )
+
+            with torch.no_grad():
+                logits = model.extract_features(**inputs)
+                if is_feats_dim_768:
+                    feats = logits[0]
+                else:
+                    feats = model.final_proj(logits[0])
 
         if (
             isinstance(index, type(None)) == False

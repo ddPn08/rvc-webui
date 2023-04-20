@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import torch
 from fairseq import checkpoint_utils
 from pydub import AudioSegment
+from transformers import Wav2Vec2FeatureExtractor, HubertModel
 
 from .cmd_opts import opts
 from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
@@ -102,10 +103,19 @@ class VC_MODEL:
             "hubert_base768": ("hubert_base.pt", "hubert_base"),
             "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
             "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
+            "distilhubert": (load_transformers_hubert, "ntu-spml/distilhubert"),
+            "distilhubert768": (load_transformers_hubert, "ntu-spml/distilhubert"),
         }
         if not self.embedder_name in load_emb_dic.keys():
             raise Exception(f"Not supported embedder: {self.embedder_name}")
-        if (
+        if callable(load_emb_dic[self.embedder_name][0]):
+            if (
+                embedder_model == None
+                or loaded_embedder_model != self.embedder_name
+            ):
+                print(f"load {self.embedder_name} embedder")
+                load_emb_dic[self.embedder_name][0](load_emb_dic[self.embedder_name][1], self.embedder_name)
+        elif (
             embedder_model == None
             or loaded_embedder_model != load_emb_dic[self.embedder_name][1]
         ):
@@ -232,6 +242,21 @@ def load_embedder(emb_file, emb_name):
         embedder_model = embedder_model.float()
     embedder_model.eval()
 
+    loaded_embedder_model = emb_name
+    
+    
+def load_transformers_hubert(repo_name, emb_name):
+    global embedder_model, loaded_embedder_model
+    embedder_model = (
+        Wav2Vec2FeatureExtractor.from_pretrained(repo_name),
+        HubertModel.from_pretrained(repo_name).to(device)
+    )
+    if is_half:
+        embedder_model[1].half()
+    else:
+        embedder_model[1].float()
+    embedder_model[1].eval()
+    
     loaded_embedder_model = emb_name
 
 

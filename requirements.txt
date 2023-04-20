@@ -16,4 +16,5 @@ soxr==0.3.5
 
 tensorboard
 tensorboardX
+transformers
 requests

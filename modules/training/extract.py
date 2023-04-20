@@ -12,6 +12,7 @@ import soundfile as sf
 import torch
 import torch.nn.functional as F
 from fairseq import checkpoint_utils
+from transformers import Wav2Vec2FeatureExtractor, HubertModel
 
 from modules.models import MODELS_DIR
 from modules.shared import device
@@ -179,6 +180,20 @@ def load_embedder(emb_file):
     return embedder_model, cfg
 
 
+def load_transformers_hubert(repo_name):
+    embedder_model = (
+        Wav2Vec2FeatureExtractor.from_pretrained(repo_name),
+        HubertModel.from_pretrained(repo_name).to(device)
+    )
+    if device != "cpu":
+        embedder_model[1].half()
+    else:
+        embedder_model[1].float()
+    embedder_model[1].eval()
+    
+    return embedder_model
+
+
 def extract_feature(training_dir: str, embedder_name: str):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
@@ -218,10 +233,16 @@ def extract_feature(training_dir: str, embedder_name: str):
         "hubert_base768": ("hubert_base.pt", "hubert_base"),
         "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
         "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
+        "distilhubert": (load_transformers_hubert, "ntu-spml/distilhubert"),
+        "distilhubert768": (load_transformers_hubert, "ntu-spml/distilhubert"),
     }
     if not embedder_name in load_emb_dic:
         return f"Not supported embedder: {embedder_name}"
-    model, cfg = load_embedder(load_emb_dic[embedder_name][0])
+    if callable(load_emb_dic[embedder_name][0]):
+        model = load_emb_dic[embedder_name][0](load_emb_dic[embedder_name][1])
+        cfg = None
+    else:
+        model, cfg = load_embedder(load_emb_dic[embedder_name][0])
 
     is_feats_dim_768 = embedder_name.endswith("768")
 
@@ -239,31 +260,47 @@ def extract_feature(training_dir: str, embedder_name: str):
 
                     os.makedirs(os.path.dirname(out_filepath), exist_ok=True)
 
-                    feats = readwave(wav_filepath, normalize=cfg.task.normalize)
-                    padding_mask = torch.BoolTensor(feats.shape).fill_(False)
-                    inputs = (
-                        {
-                            "source": feats.half().to(device)
-                            if device != "cpu"
-                            else feats.to(device),
-                            "padding_mask": padding_mask.to(device),
-                            "output_layer": 9,  # layer 9
-                        }
-                        if not is_feats_dim_768
-                        else {
-                            "source": feats.half().to(device)
-                            if device != "cpu"
-                            else feats.to(device),
-                            "padding_mask": padding_mask.to(device),
-                            # no pass "output_layer"
-                        }
-                    )
-                    with torch.no_grad():
-                        logits = model.extract_features(**inputs)
-                        if is_feats_dim_768:
-                            feats = logits[0]
+                    feats = readwave(wav_filepath, normalize=False if cfg is None else cfg.task.normalize)
+                    if isinstance(model, tuple):
+                        # if device != "cpu":
+                        #     feats = feats.squeeze(0).squeeze(0).to(device).half()
+                        # else:
+                        #     feats = feats.squeeze(0).squeeze(0).to(device)
+                        feats = model[0](feats.squeeze(0).squeeze(0).to(device), return_tensors="pt", sampling_rate=16000)
+                        if device != "cpu":
+                            feats = feats.input_values.to(device).half()
                         else:
-                            feats = model.final_proj(logits[0])
+                            feats = feats.input_values.to(device)
+                        with torch.no_grad():
+                            if is_feats_dim_768:
+                                feats = model[1](feats).last_hidden_state
+                            else:
+                                feats = model[1](feats).extract_features
+                    else:
+                        padding_mask = torch.BoolTensor(feats.shape).fill_(False)
+                        inputs = (
+                            {
+                                "source": feats.half().to(device)
+                                if device != "cpu"
+                                else feats.to(device),
+                                "padding_mask": padding_mask.to(device),
+                                "output_layer": 9,  # layer 9
+                            }
+                            if not is_feats_dim_768
+                            else {
+                                "source": feats.half().to(device)
+                                if device != "cpu"
+                                else feats.to(device),
+                                "padding_mask": padding_mask.to(device),
+                                # no pass "output_layer"
+                            }
+                        )
+                        with torch.no_grad():
+                            logits = model.extract_features(**inputs)
+                            if is_feats_dim_768:
+                                feats = logits[0]
+                            else:
+                                feats = model.final_proj(logits[0])
 
                     feats = feats.squeeze(0).float().cpu().numpy()
                     if np.isnan(feats).sum() == 0:
