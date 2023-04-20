@@ -107,7 +107,7 @@ def run(
     embedder_path: str,
     is_feats_dim_768: bool,
     gpu_ids: List[int],
-    device: torch.device = None,
+    device: Union[torch.device, str] = None,
 ):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
@@ -132,6 +132,8 @@ def run(
     ]
 
     if device is not None:
+        if type(device) == str:
+            device = torch.device(device)
         processor(
             todo,
             device,
@@ -147,7 +149,7 @@ def run(
                 executor.submit(
                     processor,
                     todo[i::num_gpus],
-                    f"cuda:{id}",
+                    torch.device(f"cuda:{id}"),
                     embedder_path,
                     is_feats_dim_768,
                     wav_dir,
