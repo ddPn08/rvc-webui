@@ -87,8 +87,8 @@ class TextAudioLoader(torch.utils.data.Dataset):
                     sampling_rate, self.sampling_rate
                 )
             )
-        audio_norm = audio / self.max_wav_value
-        audio_norm = audio_norm.unsqueeze(0)
+        # audio_norm = audio / self.max_wav_value
+        audio_norm = audio.unsqueeze(0)
         spec_filename = filename.replace(".wav", ".spec.pt")
         if os.path.exists(spec_filename):
             try:
@@ -219,8 +219,8 @@ class TextAudioLoaderMultiNSFsid(torch.utils.data.Dataset):
                     sampling_rate, self.sampling_rate
                 )
             )
-        audio_norm = audio / self.max_wav_value
-        audio_norm = audio_norm.unsqueeze(0)
+        # audio_norm = audio / self.max_wav_value
+        audio_norm = audio.unsqueeze(0)
         spec_filename = filename.replace(".wav", ".spec.pt")
         if os.path.exists(spec_filename):
             try:

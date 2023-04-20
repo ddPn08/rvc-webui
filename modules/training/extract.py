@@ -1,7 +1,6 @@
 import asyncio
 import os
 import traceback
-from multiprocessing import Process
 from typing import *
 
 import librosa
@@ -12,6 +11,7 @@ import soundfile as sf
 import torch
 import torch.nn.functional as F
 from fairseq import checkpoint_utils
+from tqdm import tqdm
 from transformers import Wav2Vec2FeatureExtractor, HubertModel
 
 from modules.models import MODELS_DIR
@@ -90,7 +90,7 @@ class FeatureInput(object):
 
     def go(self, paths, f0_method):
         if len(paths) != 0:
-            for idx, (inp_path, opt_path1, opt_path2) in enumerate(paths):
+            for idx, (inp_path, opt_path1, opt_path2) in enumerate(tqdm(paths)):
                 try:
                     if (
                         os.path.exists(opt_path1 + ".npy") == True
@@ -149,19 +149,7 @@ def extract_f0(training_dir: str, num_processes: int, f0_method: str):
         os.makedirs(dir[0], exist_ok=True)
         os.makedirs(dir[1], exist_ok=True)
 
-    ps = []
-    for i in range(num_processes):
-        p = Process(
-            target=feature_input.go,
-            args=(
-                paths[i::num_processes],
-                f0_method,
-            ),
-        )
-        p.start()
-        ps.append(p)
-    for p in ps:
-        p.join()
+    feature_input.go(paths, f0_method)
 
 
 def load_embedder(emb_file):

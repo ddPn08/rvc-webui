@@ -5,13 +5,25 @@ from typing import *
 import torch
 
 
-def write_config(state_dict: Dict[str, Any], cfg: Dict[str, Any]):
-    state_dict["config"] = [x for x in cfg.values()]
+def write_config(
+    state_dict: Dict[str, Any], cfg: Dict[str, Any], vc_client_compatible: bool = False
+):
+    state_dict["config"] = []
+    for key, x in cfg.items():
+        if key == "emb_channels" and vc_client_compatible:
+            continue
+        state_dict["config"].append(x)
     state_dict["params"] = cfg
 
 
 def create_trained_model(
-    weights: Dict[str, Any], sr: int, f0: int, emb_name: str, emb_ch: int, epoch: int
+    weights: Dict[str, Any],
+    sr: int,
+    f0: int,
+    emb_name: str,
+    emb_ch: int,
+    epoch: int,
+    vc_client_compatible: bool = False,
 ):
     state_dict = OrderedDict()
     state_dict["weight"] = {}
@@ -43,6 +55,7 @@ def create_trained_model(
                 "emb_channels": emb_ch,
                 "sr": 40000,
             },
+            vc_client_compatible,
         )
     elif sr == "48k":
         write_config(
@@ -68,6 +81,7 @@ def create_trained_model(
                 "emb_channels": emb_ch,
                 "sr": 48000,
             },
+            vc_client_compatible,
         )
     elif sr == "32k":
         write_config(
@@ -93,6 +107,7 @@ def create_trained_model(
                 "emb_channels": emb_ch,
                 "sr": 32000,
             },
+            vc_client_compatible,
         )
     state_dict["info"] = f"{epoch}epoch"
     state_dict["sr"] = sr
@@ -102,7 +117,14 @@ def create_trained_model(
 
 
 def save(
-    model, sr: int, f0: int, emb_name: str, emb_ch: int, filepath: str, epoch: int
+    model,
+    sr: int,
+    f0: int,
+    emb_name: str,
+    emb_ch: int,
+    filepath: str,
+    epoch: int,
+    vc_client_compatible: bool = False,
 ):
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
@@ -111,6 +133,14 @@ def save(
 
     print(f"save: emb_name: {emb_name} {emb_ch}")
 
-    state_dict = create_trained_model(state_dict, sr, f0, emb_name, emb_ch, epoch)
+    state_dict = create_trained_model(
+        state_dict,
+        sr,
+        f0,
+        emb_name,
+        emb_ch,
+        epoch,
+        vc_client_compatible=vc_client_compatible,
+    )
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     torch.save(state_dict, filepath)

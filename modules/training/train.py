@@ -80,40 +80,20 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool):
     gt_wavs_dir = os.path.join(training_dir, "0_gt_wavs")
     co256_dir = os.path.join(training_dir, "3_feature256")
 
-    names = set(
-        [
-            os.path.join(dir, name.split(".")[0])
-            for dir in os.listdir(gt_wavs_dir)
-            for name in os.listdir(os.path.join(gt_wavs_dir, dir))
-        ]
-    ) & set(
-        [
-            os.path.join(dir, name.split(".")[0])
-            for dir in os.listdir(co256_dir)
-            for name in os.listdir(os.path.join(co256_dir, dir))
-        ]
-    )
+    def list_data(dir: str):
+        files = []
+        for subdir in os.listdir(dir):
+            speaker_dir = os.path.join(dir, subdir)
+            for name in os.listdir(speaker_dir):
+                files.append(os.path.join(subdir, name.split(".")[0]))
+        return files
+
+    names = set(list_data(gt_wavs_dir)) & set(list_data(co256_dir))
 
     if f0:
         f0_dir = os.path.join(training_dir, "2a_f0")
         f0nsf_dir = os.path.join(training_dir, "2b_f0nsf")
-        names = (
-            names
-            & set(
-                [
-                    os.path.join(dir, name.split(".")[0])
-                    for dir in os.listdir(f0_dir)
-                    for name in os.listdir(os.path.join(f0_dir, dir))
-                ]
-            )
-            & set(
-                [
-                    os.path.join(dir, name.split(".")[0])
-                    for dir in os.listdir(f0nsf_dir)
-                    for name in os.listdir(os.path.join(f0nsf_dir, dir))
-                ]
-            )
-        )
+        names = names & set(list_data(f0_dir)) & set(list_data(f0nsf_dir))
 
     meta = {
         "files": {},
@@ -142,37 +122,6 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool):
                 "co256": co256_path,
                 "speaker_id": speaker_id,
             }
-
-    # if f0:
-    #     mute_gt_wav = os.path.join(
-    #         MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
-    #     )
-    #     mute_co256 = os.path.join(
-    #         co256_dir, "mute.npy"
-    #     )
-    #     mute_f0 = os.path.join(MODELS_DIR, "training", "mute", "2a_f0", f"mute.wav.npy")
-    #     mute_f0nsf = os.path.join(
-    #         MODELS_DIR, "training", "mute", "2b_f0nsf", f"mute.wav.npy"
-    #     )
-    #     meta["mute"] = {
-    #         "gt_wav": mute_gt_wav,
-    #         "co256": mute_co256,
-    #         "f0": mute_f0,
-    #         "f0nsf": mute_f0nsf,
-    #         "speaker_id": speaker_id,
-    #     }
-    # else:
-    #     mute_gt_wav = os.path.join(
-    #         MODELS_DIR, "training", "mute", "0_gt_wavs", f"mute{sr}.wav"
-    #     )
-    #     mute_co256 = os.path.join(
-    #         co256_dir, "mute.npy"
-    #     )
-    #     meta["mute"] = {
-    #         "gt_wav": mute_gt_wav,
-    #         "co256": mute_co256,
-    #         "speaker_id": speaker_id,
-    #     }
 
     with open(os.path.join(training_dir, "meta.json"), "w") as f:
         json.dump(meta, f, indent=2)
@@ -228,6 +177,7 @@ def train_model(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
+    vc_client_compatible: bool = False,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(find_empty_port())
@@ -265,6 +215,7 @@ def train_model(
             pretrain_d,
             embedder_name,
             save_only_last,
+            vc_client_compatible,
         ),
     )
 
@@ -297,6 +248,7 @@ def training_runner(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
+    vc_client_compatible: bool = False,
 ):
     batch_size = int(batch_size)
     config.train.batch_size = batch_size
@@ -368,6 +320,7 @@ def training_runner(
             **config.model.dict(),
             is_half=config.train.fp16_run,
         )
+
     if torch.cuda.is_available():
         net_g = net_g.cuda(rank)
 
@@ -446,6 +399,7 @@ def training_runner(
             )
             if is_main_process:
                 print(f"loaded pretrained {pretrain_g} {pretrain_d}")
+
     else:
         _, _, _, epoch = utils.load_checkpoint(last_d_state, net_d, optim_d)
         _, _, _, epoch = utils.load_checkpoint(last_g_state, net_g, optim_g)
@@ -733,6 +687,7 @@ def training_runner(
                 embedder_out_channels,
                 os.path.join(training_dir, "checkpoints", f"{model_name}-{epoch}.pth"),
                 epoch,
+                vc_client_compatible=vc_client_compatible,
             )
 
         scheduler_g.step()
@@ -748,4 +703,5 @@ def training_runner(
             embedder_out_channels,
             os.path.join(MODELS_DIR, "checkpoints", f"{model_name}.pth"),
             epoch,
+            vc_client_compatible=vc_client_compatible,
         )
