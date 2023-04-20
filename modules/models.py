@@ -93,8 +93,8 @@ class VC_MODEL:
         big_npy_file: str,
         index_rate: float,
     ):
-        if input_audio is None:
-            raise Exception("You need to upload an audio")
+        if not input_audio:
+            raise Exception("You need to set Source Audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
 
