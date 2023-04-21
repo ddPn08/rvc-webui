@@ -1,26 +1,34 @@
 import asyncio
 import os
+import re
 import posixpath
 from typing import *
 from urllib.parse import urlparse
 
 import torch
 from fairseq import checkpoint_utils
+from fairseq.models.hubert.hubert import HubertModel
 from pydub import AudioSegment
 
+from lib.rvc.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
+from lib.rvc.pipeline import VocalConvertPipeline
+
 from .cmd_opts import opts
-from .inference.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
-from .inference.pipeline import VC
 from .shared import ROOT_DIR, device, is_half
 from .utils import donwload_file, load_audio
 
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
+EMBEDDERS_LIST = {
+    "hubert_base": ("hubert_base.pt", "hubert_base"),
+    "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
+}
+
+
 def update_state_dict(state_dict):
-    if "params" in state_dict:
+    if "params" in state_dict and state_dict["params"] is not None:
         return
-    state_dict["params"] = {}
     keys = [
         "spec_channels",
         "segment_size",
@@ -42,18 +50,25 @@ def update_state_dict(state_dict):
         "emb_channels",
         "sr",
     ]
+    state_dict["params"] = {}
+    n = 0
     for i, key in enumerate(keys):
+        i = i - n
+        if len(state_dict["config"]) != 19 and key == "emb_channels":
+            # backward compat.
+            state_dict["params"][key] = 256
+            n += 1
+            continue
         state_dict["params"][key] = state_dict["config"][i]
 
 
-class VC_MODEL:
+class VoiceConvertModel:
     def __init__(self, model_name: str, state_dict: Dict[str, Any]) -> None:
         update_state_dict(state_dict)
         self.model_name = model_name
         self.weight = state_dict
         self.tgt_sr = state_dict["params"]["sr"]
         f0 = state_dict.get("f0", 1)
-        self.embedder_name = state_dict.get("embedder_name", "hubert_base")
         state_dict["params"]["spk_embed_dim"] = state_dict["weight"][
             "emb_g.weight"
         ].shape[0]
@@ -77,13 +92,14 @@ class VC_MODEL:
         else:
             self.net_g = self.net_g.float()
 
-        self.vc = VC(self.tgt_sr, device, is_half)
+        self.vc = VocalConvertPipeline(self.tgt_sr, device, is_half)
         self.n_spk = state_dict["params"]["spk_embed_dim"]
 
     def single(
         self,
         sid: int,
         input_audio: str,
+        embedder_model_name: str,
         f0_up_key: int,
         f0_file: str,
         f0_method: str,
@@ -92,27 +108,20 @@ class VC_MODEL:
         big_npy_file: str,
         index_rate: float,
     ):
-        if input_audio is None:
-            raise Exception("You need to upload an audio")
+        if not input_audio:
+            raise Exception("You need to set Source Audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
-
-        load_emb_dic = {
-            "hubert_base": ("hubert_base.pt", "hubert_base"),
-            "hubert_base768": ("hubert_base.pt", "hubert_base"),
-            "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
-            "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
-        }
-        if not self.embedder_name in load_emb_dic.keys():
-            raise Exception(f"Not supported embedder: {self.embedder_name}")
+        if not embedder_model_name in EMBEDDERS_LIST.keys():
+            raise Exception(f"Not supported embedder: {embedder_model_name}")
         if (
             embedder_model == None
-            or loaded_embedder_model != load_emb_dic[self.embedder_name][1]
+            or loaded_embedder_model != EMBEDDERS_LIST[embedder_model_name][1]
         ):
-            print(f"load {self.embedder_name} embedder")
-            load_embedder(
-                load_emb_dic[self.embedder_name][0], load_emb_dic[self.embedder_name][1]
-            )
+            print(f"load {embedder_model_name} embedder")
+            embedder_filename, embedder_name = get_embedder(embedder_model_name)
+            load_embedder(embedder_filename, embedder_name)
+
         f0 = self.weight.get("f0", 1)
 
         if not faiss_index_file and auto_load_index:
@@ -132,7 +141,6 @@ class VC_MODEL:
             index_rate,
             f0,
             f0_file=f0_file,
-            embedder_name=self.embedder_name,
         )
 
         audio = AudioSegment(
@@ -142,11 +150,22 @@ class VC_MODEL:
             channels=1,
         )
         os.makedirs(AUDIO_OUT_DIR, exist_ok=True)
-        index = os.listdir(AUDIO_OUT_DIR)
+        input_audio_splitext = os.path.splitext(os.path.basename(input_audio))[0]
+        model_splitext = os.path.splitext(self.model_name)[0]
+        index = 0
+        existing_files = os.listdir(AUDIO_OUT_DIR)
+        for existing_file in existing_files:
+            result = re.match(r"\d+", existing_file)
+            if result:
+                prefix_num = int(result.group(0))
+                if index < prefix_num:
+                    index = prefix_num
         audio.export(
-            os.path.join(AUDIO_OUT_DIR, f"{len(index)+1}-output.wav"), format="wav"
+            os.path.join(
+                AUDIO_OUT_DIR, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"
+            ),
+            format="wav",
         )
-
         return audio_opt
 
     def get_big_npy_path(self, speaker_id: int):
@@ -175,8 +194,8 @@ class VC_MODEL:
 
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
-vc_model: Optional[VC_MODEL] = None
-embedder_model = None
+vc_model: Optional[VoiceConvertModel] = None
+embedder_model: Optional[HubertModel] = None
 loaded_embedder_model = ""
 
 
@@ -218,6 +237,12 @@ def get_models():
     ]
 
 
+def get_embedder(embedder_name):
+    if embedder_name in EMBEDDERS_LIST:
+        return EMBEDDERS_LIST[embedder_name]
+    return None
+
+
 def load_embedder(emb_file, emb_name):
     global embedder_model, loaded_embedder_model
     models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
@@ -235,44 +260,10 @@ def load_embedder(emb_file, emb_name):
     loaded_embedder_model = emb_name
 
 
-def load_hubert():
-    global embedder_model, loaded_embedder_model
-    models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-        [os.path.join(MODELS_DIR, "hubert_base.pt")],
-        suffix="",
-    )
-    embedder_model = models[0]
-    embedder_model = embedder_model.to(device)
-    if is_half:
-        embedder_model = embedder_model.half()
-    else:
-        embedder_model = embedder_model.float()
-    embedder_model.eval()
-
-    loaded_embedder_model = "hubert_base"
-
-
-def load_contentvec():
-    global embedder_model, loaded_embedder_model
-    models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-        [os.path.join(MODELS_DIR, "checkpoint_best_legacy_500.pt")],
-        suffix="",
-    )
-    embedder_model = models[0]
-    embedder_model = embedder_model.to(device)
-    if is_half:
-        embedder_model = embedder_model.half()
-    else:
-        embedder_model = embedder_model.float()
-    embedder_model.eval()
-
-    loaded_embedder_model = "contentvec"
-
-
 def get_vc_model(model_name: str):
     model_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
     weight = torch.load(model_path, map_location="cpu")
-    return VC_MODEL(model_name, weight)
+    return VoiceConvertModel(model_name, weight)
 
 
 def load_model(model_name: str):

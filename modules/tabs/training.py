@@ -4,16 +4,10 @@ from multiprocessing import cpu_count
 
 import gradio as gr
 
-from modules import utils
-from modules.shared import MODELS_DIR
-from modules.training.extract import extract_f0, extract_feature
-from modules.training.preprocess import preprocess_dataset
-from modules.training.train import (
-    create_dataset_meta,
-    glob_dataset,
-    train_index,
-    train_model,
-)
+from lib.rvc.preprocessing import extract_f0, extract_feature, split
+from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from modules import models, utils
+from modules.shared import MODELS_DIR, device
 from modules.ui import Tab
 
 SR_DICT = {
@@ -41,8 +35,10 @@ class Training(Tab):
             norm_audio_when_preprocess,
             pitch_extraction_algo,
             embedder_name,
+            embedding_channels,
             ignore_cache,
         ):
+            embedding_channels = int(embedding_channels)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
@@ -56,7 +52,7 @@ class Training(Tab):
             datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
-            preprocess_dataset(
+            split.preprocess_audio(
                 datasets,
                 SR_DICT[target_sr],
                 num_cpu_process,
@@ -66,23 +62,35 @@ class Training(Tab):
 
             if f0:
                 yield "Extracting f0..."
-                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+                extract_f0.run(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir, embedder_name)
+
+            embedder_filepath, _ = models.get_embedder(embedder_name)
+
+            extract_feature.run(
+                training_dir,
+                embedder_filepath,
+                embedding_channels == 768,
+                None,
+                device,
+            )
+
+            out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
             yield "Training index..."
             train_index(
                 training_dir,
                 model_name,
-                256 if not embedder_name.endswith("768") else 768,
+                out_dir,
+                embedding_channels,
             )
 
             yield "Training complete"
 
         def train_all(
             model_name,
-            target_sr,
+            sampling_rate_str,
             f0,
             dataset_glob,
             speaker_id,
@@ -97,27 +105,35 @@ class Training(Tab):
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
             embedder_name,
+            embedding_channels,
             ignore_cache,
             vc_client_compatible,
         ):
-            if embedder_name.endswith("768") and vc_client_compatible:
-                yield "Error: 768 dim embedder is not compatible with VC client"
+            batch_size = int(batch_size)
+            num_epochs = int(num_epochs)
+            embedding_channels = int(embedding_channels)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
-            yield f"Training directory: {training_dir}"
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
+
+            if embedding_channels == 768 and vc_client_compatible:
+                yield "Error: 768 dim embedder is not compatible with VC client"
+                return
 
             if os.path.exists(training_dir) and ignore_cache:
                 shutil.rmtree(training_dir)
 
             os.makedirs(training_dir, exist_ok=True)
 
+            yield f"Training directory: {training_dir}"
+
             datasets = glob_dataset(dataset_glob, speaker_id)
 
             yield "Preprocessing..."
-            preprocess_dataset(
+            split.preprocess_audio(
                 datasets,
-                SR_DICT[target_sr],
+                SR_DICT[sampling_rate_str],
                 num_cpu_process,
                 training_dir,
                 norm_audio_when_preprocess,
@@ -125,22 +141,37 @@ class Training(Tab):
 
             if f0:
                 yield "Extracting f0..."
-                extract_f0(training_dir, num_cpu_process, pitch_extraction_algo)
+                extract_f0.run(training_dir, num_cpu_process, pitch_extraction_algo)
 
             yield "Extracting features..."
-            extract_feature(training_dir, embedder_name)
 
-            create_dataset_meta(training_dir, target_sr, f0)
+            embedder_filepath, _ = models.get_embedder(embedder_name)
+
+            extract_feature.run(
+                training_dir,
+                os.path.join(MODELS_DIR, embedder_filepath),
+                embedding_channels == 768,
+                gpu_ids,
+            )
+
+            create_dataset_meta(training_dir, sampling_rate_str, f0)
 
             yield "Training model..."
 
             print(f"train_all: emb_name: {embedder_name}")
 
+            config = utils.load_config(
+                training_dir, sampling_rate_str, embedding_channels
+            )
+            out_dir = os.path.join(MODELS_DIR, "checkpoints")
+
             train_model(
-                gpu_id.split(","),
+                gpu_ids,
+                config,
                 training_dir,
                 model_name,
-                target_sr,
+                out_dir,
+                sampling_rate_str,
                 1 if f0 else 0,
                 batch_size,
                 cache_batch,
@@ -154,11 +185,7 @@ class Training(Tab):
 
             yield "Training index..."
 
-            train_index(
-                training_dir,
-                model_name,
-                256 if not embedder_name.endswith("768") else 768,
-            )
+            train_index(training_dir, model_name, out_dir, embedding_channels)
 
             yield "Training completed"
 
@@ -190,18 +217,18 @@ class Training(Tab):
                             choices=[
                                 "hubert_base",
                                 "contentvec",
-                                "hubert_base768",
-                                "contentvec768",
                             ],
                             value="hubert_base",
                             label="Using phone embedder",
                         )
-                        norm_audio_when_preprocess = gr.Radio(
-                            choices=["Yes", "No"],
-                            value="Yes",
-                            label="Normalize audio volume when preprocess",
+                        embedding_channels = gr.Radio(
+                            choices=["256", "768"],
+                            value="256",
+                            label="Embedding channels",
                         )
-                        vc_client_compatible = gr.Checkbox(label="VC Client compatible", value=True)
+                        vc_client_compatible = gr.Checkbox(
+                            label="VC Client compatible", value=True
+                        )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",
@@ -214,6 +241,11 @@ class Training(Tab):
                             value=cpu_count(),
                             label="Number of CPU processes",
                         )
+                        norm_audio_when_preprocess = gr.Radio(
+                            choices=["Yes", "No"],
+                            value="Yes",
+                            label="Normalize audio volume when preprocess",
+                        )
                         pitch_extraction_algo = gr.Radio(
                             choices=["pm", "harvest", "dio"],
                             value="harvest",
@@ -221,28 +253,25 @@ class Training(Tab):
                         )
                     with gr.Row().style(equal_height=False):
                         batch_size = gr.Number(value=4, step=1, label="Batch size")
-                        num_epochs = gr.Slider(
-                            minimum=1,
-                            maximum=1000,
-                            value=100,
-                            step=1,
+                        num_epochs = gr.Number(
+                            value=30,
                             label="Number of epochs",
                         )
                         save_every_epoch = gr.Slider(
                             minimum=0,
-                            maximum=1000,
+                            maximum=100,
                             value=10,
                             step=1,
                             label="Save every epoch",
                         )
                         cache_batch = gr.Checkbox(label="Cache batch", value=True)
                     with gr.Row().style(equal_height=False):
-                        pre_trained_bottom_model_g = gr.Textbox(
-                            label="Pre-trained bottom model G path",
+                        pre_trained_generator = gr.Textbox(
+                            label="Pre trained generator path",
                             value=os.path.join(MODELS_DIR, "pretrained", "f0G40k.pth"),
                         )
-                        pre_trained_bottom_model_d = gr.Textbox(
-                            label="Pre-trained bottom model D path",
+                        pre_trained_discriminator = gr.Textbox(
+                            label="Pre trained discriminator path",
                             value=os.path.join(MODELS_DIR, "pretrained", "f0D40k.pth"),
                         )
 
@@ -264,6 +293,7 @@ class Training(Tab):
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 embedder_name,
+                embedding_channels,
                 ignore_cache,
             ],
             outputs=[status],
@@ -285,9 +315,10 @@ class Training(Tab):
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
-                pre_trained_bottom_model_g,
-                pre_trained_bottom_model_d,
+                pre_trained_generator,
+                pre_trained_discriminator,
                 embedder_name,
+                embedding_channels,
                 ignore_cache,
                 vc_client_compatible,
             ],

@@ -1,7 +1,10 @@
+from typing import *
 import os
 import traceback
 
 import faiss
+from faiss.swigfaiss_avx2 import IndexIVFFlat
+from fairseq.models.hubert import HubertModel
 import numpy as np
 import parselmouth
 import pyworld
@@ -9,40 +12,35 @@ import scipy.signal as signal
 import torch
 import torch.nn.functional as F
 
-from modules.shared import is_half
-
-if is_half:
-    # 6G显存配置
-    x_pad = 3
-    x_query = 10
-    x_center = 60
-    x_max = 65
-else:
-    # 5G显存配置
-    x_pad = 1
-    # x_query     =   6
-    # x_center    =   30
-    # x_max       =   32
-    # 6G显存配置
-    x_query = 6
-    x_center = 38
-    x_max = 41
+from .models import SynthesizerTrnMs256NSFSid
 
 
-class VC(object):
-    def __init__(self, tgt_sr, device, is_half):
-        self.sr = 16000  # hubert输入采样率
-        self.window = 160  # 每帧点数
-        self.t_pad = self.sr * x_pad  # 每条前后pad时间
-        self.t_pad_tgt = tgt_sr * x_pad
+class VocalConvertPipeline(object):
+    def __init__(self, tgt_sr: int, device: Union[str, torch.device], is_half: bool):
+        self.x_pad = 3 if is_half else 1
+        self.x_query = 10 if is_half else 6
+        self.x_center = 60 if is_half else 30
+        self.x_max = 65 if is_half else 32
+
+        self.sr = 16000  # hubert input sample rate
+        self.window = 160  # hubert input window
+        self.t_pad = self.sr * self.x_pad  # padding time for each utterance
+        self.t_pad_tgt = tgt_sr * self.x_pad
         self.t_pad2 = self.t_pad * 2
-        self.t_query = self.sr * x_query  # 查询切点前后查询时间
-        self.t_center = self.sr * x_center  # 查询切点位置
-        self.t_max = self.sr * x_max  # 免查询时长阈值
+        self.t_query = self.sr * self.x_query  # query time before and after query point
+        self.t_center = self.sr * self.x_query  # query cut point position
+        self.t_max = self.sr * self.x_max  # max time for no query
         self.device = device
         self.is_half = is_half
 
-    def get_f0(self, x, p_len, f0_up_key, f0_method, inp_f0=None):
+    def get_f0(
+        self,
+        x: np.ndarray,
+        p_len: int,
+        f0_up_key: int,
+        f0_method: str,
+        inp_f0: np.ndarray = None,
+    ):
         time_step = self.window / self.sr * 1000
         f0_min = 50
         f0_max = 1100
@@ -75,8 +73,7 @@ class VC(object):
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
             f0 = signal.medfilt(f0, 3)
         f0 *= pow(2, f0_up_key / 12)
-        # with open("test.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
-        tf0 = self.sr // self.window  # 每秒f0点数
+        tf0 = self.sr // self.window  # f0 points per second
         if inp_f0 is not None:
             delta_t = np.round(
                 (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
@@ -84,9 +81,11 @@ class VC(object):
             replace_f0 = np.interp(
                 list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
             )
-            shape = f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)].shape[0]
-            f0[x_pad * tf0 : x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
-        # with open("test_opt.txt","w")as f:f.write("\n".join([str(i)for i in f0.tolist()]))
+            shape = f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)].shape[0]
+            f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[
+                :shape
+            ]
+
         f0bak = f0.copy()
         f0_mel = 1127 * np.log(1 + f0 / 700)
         f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
@@ -97,19 +96,18 @@ class VC(object):
         f0_coarse = np.rint(f0_mel).astype(np.int)
         return f0_coarse, f0bak  # 1-0
 
-    def vc(
+    def _convert(
         self,
-        model,
-        net_g,
-        sid,
-        audio,
-        pitch,
-        pitchf,
-        index,
-        big_npy,
-        index_rate,
-        embedder_name,
-    ):  # ,file_index,file_big_npy
+        model: HubertModel,
+        net_g: SynthesizerTrnMs256NSFSid,
+        sid: int,
+        audio: np.ndarray,
+        pitch: np.ndarray,
+        pitchf: np.ndarray,
+        index: IndexIVFFlat,
+        big_npy: np.ndarray,
+        index_rate: float,
+    ):
         feats = torch.from_numpy(audio)
         if self.is_half:
             feats = feats.half()
@@ -121,7 +119,7 @@ class VC(object):
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
 
-        is_feats_dim_768 = embedder_name.endswith("768")
+        is_feats_dim_768 = net_g.emb_channels == 768
 
         inputs = (
             {
@@ -194,18 +192,17 @@ class VC(object):
 
     def __call__(
         self,
-        model,
-        net_g,
-        sid,
-        audio,
-        f0_up_key,
-        f0_method,
-        file_index,
-        file_big_npy,
-        index_rate,
-        if_f0,
-        f0_file=None,
-        embedder_name="hubert_base",
+        model: HubertModel,
+        net_g: SynthesizerTrnMs256NSFSid,
+        sid: int,
+        audio: np.ndarray,
+        transpose: int,
+        f0_method: str,
+        file_index: str,
+        file_big_npy: str,
+        index_rate: float,
+        if_f0: bool,
+        f0_file: str = None,
     ):
         if (
             file_big_npy != ""
@@ -259,7 +256,7 @@ class VC(object):
         sid = torch.tensor(sid, device=self.device).unsqueeze(0).long()
         pitch, pitchf = None, None
         if if_f0 == 1:
-            pitch, pitchf = self.get_f0(audio_pad, p_len, f0_up_key, f0_method, inp_f0)
+            pitch, pitchf = self.get_f0(audio_pad, p_len, transpose, f0_method, inp_f0)
             pitch = pitch[:p_len]
             pitchf = pitchf[:p_len]
             pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
@@ -274,7 +271,7 @@ class VC(object):
             t = t // self.window * self.window
             if if_f0 == 1:
                 audio_opt.append(
-                    self.vc(
+                    self._convert(
                         model,
                         net_g,
                         sid,
@@ -284,12 +281,11 @@ class VC(object):
                         index,
                         big_npy,
                         index_rate,
-                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             else:
                 audio_opt.append(
-                    self.vc(
+                    self._convert(
                         model,
                         net_g,
                         sid,
@@ -299,13 +295,12 @@ class VC(object):
                         index,
                         big_npy,
                         index_rate,
-                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             s = t
         if if_f0 == 1:
             audio_opt.append(
-                self.vc(
+                self._convert(
                     model,
                     net_g,
                     sid,
@@ -315,12 +310,11 @@ class VC(object):
                     index,
                     big_npy,
                     index_rate,
-                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         else:
             audio_opt.append(
-                self.vc(
+                self._convert(
                     model,
                     net_g,
                     sid,
@@ -330,7 +324,6 @@ class VC(object):
                     index,
                     big_npy,
                     index_rate,
-                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         audio_opt = np.concatenate(audio_opt)

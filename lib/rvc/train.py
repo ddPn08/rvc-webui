@@ -19,15 +19,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from ..inference import commons
-from ..inference.models import (
-    MultiPeriodDiscriminator,
-    SynthesizerTrnMs256NSFSid,
-    SynthesizerTrnMs256NSFSidNono,
-)
-from ..shared import MODELS_DIR
-from ..utils import find_empty_port
-from . import utils
+from . import commons, utils
 from .checkpoints import save
 from .config import DatasetMetadata, TrainConfig
 from .data_utils import (
@@ -39,6 +31,11 @@ from .data_utils import (
 )
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
+from .models import (
+    MultiPeriodDiscriminator,
+    SynthesizerTrnMs256NSFSid,
+    SynthesizerTrnMs256NSFSidNono,
+)
 
 
 def glob_dataset(glob_str: str, speaker_id: int):
@@ -127,8 +124,8 @@ def create_dataset_meta(training_dir: str, sr: str, f0: bool):
         json.dump(meta, f, indent=2)
 
 
-def train_index(training_dir: str, model_name: str, emb_ch: int):
-    checkpoint_path = os.path.join(MODELS_DIR, "checkpoints", model_name)
+def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int):
+    checkpoint_path = os.path.join(out_dir, model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
     index_dir = os.path.join(os.path.dirname(checkpoint_path), f"{model_name}_index")
     os.makedirs(index_dir, exist_ok=True)
@@ -165,8 +162,10 @@ def train_index(training_dir: str, model_name: str, emb_ch: int):
 
 def train_model(
     gpus: List[int],
+    config: TrainConfig,
     training_dir: str,
     model_name: str,
+    out_dir: str,
     sample_rate: int,
     f0: int,
     batch_size: int,
@@ -180,7 +179,7 @@ def train_model(
     vc_client_compatible: bool = False,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = str(find_empty_port())
+    os.environ["MASTER_PORT"] = str(utils.find_empty_port())
 
     deterministic = torch.backends.cudnn.deterministic
     benchmark = torch.backends.cudnn.benchmark
@@ -190,10 +189,6 @@ def train_model(
     torch.backends.cudnn.benchmark = False
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(gpu) for gpu in gpus])
-
-    config = utils.load_config(
-        training_dir, sample_rate, 768 if embedder_name.endswith("768") else 256
-    )
 
     start = time.perf_counter()
 
@@ -205,6 +200,7 @@ def train_model(
             config,
             training_dir,
             model_name,
+            out_dir,
             sample_rate,
             f0,
             batch_size,
@@ -238,6 +234,7 @@ def training_runner(
     config: TrainConfig,
     training_dir: str,
     model_name: str,
+    out_dir: str,
     sample_rate: int,
     f0: int,
     batch_size: int,
@@ -250,7 +247,6 @@ def training_runner(
     save_only_last: bool = False,
     vc_client_compatible: bool = False,
 ):
-    batch_size = int(batch_size)
     config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
     state_dir = os.path.join(training_dir, "state")
@@ -701,7 +697,7 @@ def training_runner(
             f0,
             embedder_name,
             embedder_out_channels,
-            os.path.join(MODELS_DIR, "checkpoints", f"{model_name}.pth"),
+            os.path.join(out_dir, f"{model_name}.pth"),
             epoch,
             vc_client_compatible=vc_client_compatible,
         )
