@@ -44,6 +44,10 @@ def update_state_dict(state_dict):
         "sr",
     ]
     for i, key in enumerate(keys):
+        if len(state_dict["config"]) != len(keys) and key == "emb_channels":
+            # backward compat.
+            state_dict["params"][key] = 256
+            continue
         state_dict["params"][key] = state_dict["config"][i]
 
 
@@ -148,13 +152,16 @@ class VC_MODEL:
         index = 0
         existing_files = os.listdir(AUDIO_OUT_DIR)
         for existing_file in existing_files:
-            result = re.match(r'\d+', existing_file)
+            result = re.match(r"\d+", existing_file)
             if result:
                 prefix_num = int(result.group(0))
                 if index < prefix_num:
                     index = prefix_num
         audio.export(
-            os.path.join(AUDIO_OUT_DIR, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"), format="wav"
+            os.path.join(
+                AUDIO_OUT_DIR, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"
+            ),
+            format="wav",
         )
         return audio_opt
 
