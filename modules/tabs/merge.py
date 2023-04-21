@@ -71,6 +71,7 @@ class Merge(Tab):
             method,
             speaker_id,
             source_audio,
+            embedder_name,
             transpose,
             fo_curve_file,
             pitch_extraction_algo,
@@ -82,10 +83,11 @@ class Merge(Tab):
             merged = merge_ckpt(
                 model_a, model_b, model_c, weight_text, alpha, each_key, method
             )
-            model = models.VC_MODEL("merge", merged)
+            model = models.VoiceConvertModel("merge", merged)
             audio = model.single(
                 speaker_id,
                 source_audio,
+                embedder_name,
                 transpose,
                 fo_curve_file,
                 pitch_extraction_algo,
@@ -118,7 +120,7 @@ class Merge(Tab):
                 os.path.join(models.MODELS_DIR, "checkpoints", model),
                 map_location="cpu",
             )
-            vc_model = models.VC_MODEL("merge", model)
+            vc_model = models.VoiceConvertModel("merge", model)
             max = vc_model.n_spk
             del model
             del vc_model
@@ -275,6 +277,7 @@ class Merge(Tab):
                     (
                         source_audio,
                         transpose,
+                        embedder_name,
                         pitch_extraction_algo,
                         auto_load_index,
                         faiss_index_file,
@@ -329,6 +332,7 @@ class Merge(Tab):
                 inference_opts = [
                     speaker_id,
                     source_audio,
+                    embedder_name,
                     transpose,
                     fo_curve_file,
                     pitch_extraction_algo,

@@ -19,6 +19,9 @@ def inference_options_ui():
                 value="pm",
                 label="Pitch Extraction Algorithm",
             )
+            embedder_model = gr.Radio(
+                choices=["hubert_base", "contentvec"], value="contentvec", label="Embedder Model"
+            )
         with gr.Column():
             auto_load_index = gr.Checkbox(value=False, label="Auto Load Index")
             faiss_index_file = gr.Textbox(value="", label="Faiss Index File Path")
@@ -36,6 +39,7 @@ def inference_options_ui():
     return (
         source_audio,
         transpose,
+        embedder_model,
         pitch_extraction_algo,
         auto_load_index,
         faiss_index_file,
@@ -56,6 +60,7 @@ class Inference(Tab):
         def infer(
             sid,
             input_audio,
+            embedder_model,
             f0_up_key,
             f0_file,
             f0_method,
@@ -70,6 +75,7 @@ class Inference(Tab):
                 audio = model.single(
                     sid,
                     input_audio,
+                    embedder_model,
                     f0_up_key,
                     f0_file,
                     f0_method,
@@ -90,6 +96,7 @@ class Inference(Tab):
                     (
                         source_audio,
                         transpose,
+                        embedder_model,
                         pitch_extraction_algo,
                         auto_load_index,
                         faiss_index_file,
@@ -111,6 +118,7 @@ class Inference(Tab):
             inputs=[
                 speaker_id,
                 source_audio,
+                embedder_model,
                 transpose,
                 f0_curve_file,
                 pitch_extraction_algo,
