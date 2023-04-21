@@ -43,10 +43,13 @@ def update_state_dict(state_dict):
         "emb_channels",
         "sr",
     ]
+    n = 0
     for i, key in enumerate(keys):
-        if len(state_dict["config"]) != len(keys) and key == "emb_channels":
+        i = i - n
+        if len(state_dict["config"]) != 19 and key == "emb_channels":
             # backward compat.
             state_dict["params"][key] = 256
+            n += 1
             continue
         state_dict["params"][key] = state_dict["config"][i]
 
