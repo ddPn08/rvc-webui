@@ -104,7 +104,7 @@ class VocalConvertPipeline(object):
         audio: np.ndarray,
         pitch: np.ndarray,
         pitchf: np.ndarray,
-        index: IndexIVFFlat,
+        index,
         big_npy: np.ndarray,
         index_rate: float,
     ):
