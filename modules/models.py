@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import torch
 from fairseq import checkpoint_utils
+from fairseq.models.hubert.hubert import HubertModel
 from pydub import AudioSegment
 
 from lib.rvc.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
@@ -20,9 +21,7 @@ AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 EMBEDDERS_LIST = {
     "hubert_base": ("hubert_base.pt", "hubert_base"),
-    "hubert_base768": ("hubert_base.pt", "hubert_base"),
     "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
-    "contentvec768": ("checkpoint_best_legacy_500.pt", "contentvec"),
 }
 
 
@@ -62,7 +61,6 @@ class VoiceConvertModel:
         self.weight = state_dict
         self.tgt_sr = state_dict["params"]["sr"]
         f0 = state_dict.get("f0", 1)
-        self.embedder_name = state_dict.get("embedder_name", "hubert_base")
         state_dict["params"]["spk_embed_dim"] = state_dict["weight"][
             "emb_g.weight"
         ].shape[0]
@@ -93,6 +91,7 @@ class VoiceConvertModel:
         self,
         sid: int,
         input_audio: str,
+        embedder_model_name: str,
         f0_up_key: int,
         f0_file: str,
         f0_method: str,
@@ -105,14 +104,14 @@ class VoiceConvertModel:
             raise Exception("You need to upload an audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
-        if not self.embedder_name in EMBEDDERS_LIST.keys():
-            raise Exception(f"Not supported embedder: {self.embedder_name}")
+        if not embedder_model_name in EMBEDDERS_LIST.keys():
+            raise Exception(f"Not supported embedder: {embedder_model_name}")
         if (
             embedder_model == None
-            or loaded_embedder_model != EMBEDDERS_LIST[self.embedder_name][1]
+            or loaded_embedder_model != EMBEDDERS_LIST[embedder_model_name][1]
         ):
-            print(f"load {self.embedder_name} embedder")
-            embedder_filename, embedder_name = get_embedder(self.embedder_name)
+            print(f"load {embedder_model_name} embedder")
+            embedder_filename, embedder_name = get_embedder(embedder_model_name)
             load_embedder(embedder_filename, embedder_name)
 
         f0 = self.weight.get("f0", 1)
@@ -134,7 +133,6 @@ class VoiceConvertModel:
             index_rate,
             f0,
             f0_file=f0_file,
-            embedder_name=self.embedder_name,
         )
 
         audio = AudioSegment(
@@ -178,7 +176,7 @@ class VoiceConvertModel:
 
 MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
 vc_model: Optional[VoiceConvertModel] = None
-embedder_model = None
+embedder_model: Optional[HubertModel] = None
 loaded_embedder_model = ""
 
 

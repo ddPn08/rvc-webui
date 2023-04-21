@@ -10,6 +10,8 @@ import torch.nn.functional as F
 from fairseq import checkpoint_utils
 from tqdm import tqdm
 
+from modules import shared
+
 
 def load_embedder(embedder_path: str, device):
     models, cfg, _ = checkpoint_utils.load_model_ensemble_and_task(
@@ -107,12 +109,15 @@ def run(
     embedder_path: str,
     is_feats_dim_768: bool,
     gpu_ids: List[int],
-    device: Union[torch.device, str] = None,
+    device: Optional[Union[torch.device, str]] = None,
 ):
     wav_dir = os.path.join(training_dir, "1_16k_wavs")
     out_dir = os.path.join(training_dir, "3_feature256")
 
     num_gpus = len(gpu_ids)
+
+    if num_gpus < 1:
+        device = shared.device
 
     for gpu_id in gpu_ids:
         if num_gpus < gpu_id + 1:

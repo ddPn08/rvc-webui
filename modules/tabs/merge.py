@@ -69,6 +69,7 @@ class Merge(Tab):
             method,
             speaker_id,
             source_audio,
+            embedder_name,
             transpose,
             fo_curve_file,
             pitch_extraction_algo,
@@ -84,6 +85,7 @@ class Merge(Tab):
             audio = model.single(
                 speaker_id,
                 source_audio,
+                embedder_name,
                 transpose,
                 fo_curve_file,
                 pitch_extraction_algo,
@@ -273,6 +275,7 @@ class Merge(Tab):
                     (
                         source_audio,
                         transpose,
+                        embedder_name,
                         pitch_extraction_algo,
                         auto_load_index,
                         faiss_index_file,
@@ -327,6 +330,7 @@ class Merge(Tab):
                 inference_opts = [
                     speaker_id,
                     source_audio,
+                    embedder_name,
                     transpose,
                     fo_curve_file,
                     pitch_extraction_algo,

@@ -247,7 +247,6 @@ def training_runner(
     save_only_last: bool = False,
     vc_client_compatible: bool = False,
 ):
-    batch_size = int(batch_size)
     config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
     state_dir = os.path.join(training_dir, "state")

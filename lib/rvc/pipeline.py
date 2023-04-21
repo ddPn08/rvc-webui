@@ -1,7 +1,10 @@
+from typing import *
 import os
 import traceback
 
 import faiss
+from faiss.swigfaiss_avx2 import IndexIVFFlat
+from fairseq.models.hubert import HubertModel
 import numpy as np
 import parselmouth
 import pyworld
@@ -9,9 +12,11 @@ import scipy.signal as signal
 import torch
 import torch.nn.functional as F
 
+from .models import SynthesizerTrnMs256NSFSid
+
 
 class VocalConvertPipeline(object):
-    def __init__(self, tgt_sr, device, is_half):
+    def __init__(self, tgt_sr: int, device: Union[str, torch.device], is_half: bool):
         self.x_pad = 3 if is_half else 1
         self.x_query = 10 if is_half else 6
         self.x_center = 60 if is_half else 30
@@ -28,7 +33,14 @@ class VocalConvertPipeline(object):
         self.device = device
         self.is_half = is_half
 
-    def get_f0(self, x, p_len, f0_up_key, f0_method, inp_f0=None):
+    def get_f0(
+        self,
+        x: np.ndarray,
+        p_len: int,
+        f0_up_key: int,
+        f0_method: str,
+        inp_f0: np.ndarray = None,
+    ):
         time_step = self.window / self.sr * 1000
         f0_min = 50
         f0_max = 1100
@@ -86,16 +98,15 @@ class VocalConvertPipeline(object):
 
     def _convert(
         self,
-        model,
-        net_g,
-        sid,
-        audio,
-        pitch,
-        pitchf,
-        index,
-        big_npy,
-        index_rate,
-        embedder_name,
+        model: HubertModel,
+        net_g: SynthesizerTrnMs256NSFSid,
+        sid: int,
+        audio: np.ndarray,
+        pitch: np.ndarray,
+        pitchf: np.ndarray,
+        index: IndexIVFFlat,
+        big_npy: np.ndarray,
+        index_rate: float,
     ):
         feats = torch.from_numpy(audio)
         if self.is_half:
@@ -108,7 +119,7 @@ class VocalConvertPipeline(object):
         feats = feats.view(1, -1)
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
 
-        is_feats_dim_768 = embedder_name.endswith("768")
+        is_feats_dim_768 = net_g.emb_channels == 768
 
         inputs = (
             {
@@ -181,18 +192,17 @@ class VocalConvertPipeline(object):
 
     def __call__(
         self,
-        model,
-        net_g,
-        sid,
-        audio,
-        f0_up_key,
-        f0_method,
-        file_index,
-        file_big_npy,
-        index_rate,
-        if_f0,
-        f0_file=None,
-        embedder_name="hubert_base",
+        model: HubertModel,
+        net_g: SynthesizerTrnMs256NSFSid,
+        sid: int,
+        audio: np.ndarray,
+        transpose: int,
+        f0_method: str,
+        file_index: str,
+        file_big_npy: str,
+        index_rate: float,
+        if_f0: bool,
+        f0_file: str = None,
     ):
         if (
             file_big_npy != ""
@@ -246,7 +256,7 @@ class VocalConvertPipeline(object):
         sid = torch.tensor(sid, device=self.device).unsqueeze(0).long()
         pitch, pitchf = None, None
         if if_f0 == 1:
-            pitch, pitchf = self.get_f0(audio_pad, p_len, f0_up_key, f0_method, inp_f0)
+            pitch, pitchf = self.get_f0(audio_pad, p_len, transpose, f0_method, inp_f0)
             pitch = pitch[:p_len]
             pitchf = pitchf[:p_len]
             pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
@@ -271,7 +281,6 @@ class VocalConvertPipeline(object):
                         index,
                         big_npy,
                         index_rate,
-                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             else:
@@ -286,7 +295,6 @@ class VocalConvertPipeline(object):
                         index,
                         big_npy,
                         index_rate,
-                        embedder_name,
                     )[self.t_pad_tgt : -self.t_pad_tgt]
                 )
             s = t
@@ -302,7 +310,6 @@ class VocalConvertPipeline(object):
                     index,
                     big_npy,
                     index_rate,
-                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         else:
@@ -317,7 +324,6 @@ class VocalConvertPipeline(object):
                     index,
                     big_npy,
                     index_rate,
-                    embedder_name,
                 )[self.t_pad_tgt : -self.t_pad_tgt]
             )
         audio_opt = np.concatenate(audio_opt)
