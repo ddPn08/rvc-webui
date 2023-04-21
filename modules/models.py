@@ -19,9 +19,8 @@ AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
 def update_state_dict(state_dict):
-    if "params" in state_dict:
+    if "params" in state_dict and state_dict["params"] is not None:
         return
-    state_dict["params"] = {}
     keys = [
         "spec_channels",
         "segment_size",
@@ -43,6 +42,7 @@ def update_state_dict(state_dict):
         "emb_channels",
         "sr",
     ]
+    state_dict["params"] = {}
     n = 0
     for i, key in enumerate(keys):
         i = i - n

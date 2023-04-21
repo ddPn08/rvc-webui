@@ -56,6 +56,8 @@ class Merge(Tab):
             merged = merge_ckpt(
                 model_a, model_b, model_c, weight_text, alpha, each_key, method
             )
+            if not out_name.endswith(".pth"):
+                out_name += ".pth"
             torch.save(merged, os.path.join(models.MODELS_DIR, "checkpoints", out_name))
             return "Success"
 
