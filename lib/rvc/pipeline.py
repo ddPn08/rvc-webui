@@ -3,7 +3,7 @@ import os
 import traceback
 
 import faiss
-from faiss.swigfaiss_avx2 import IndexIVFFlat
+# from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
 from fairseq.models.hubert import HubertModel
 import numpy as np
 import parselmouth
