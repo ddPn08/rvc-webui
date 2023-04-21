@@ -9,6 +9,7 @@ import torch
 from fairseq import checkpoint_utils
 from fairseq.models.hubert.hubert import HubertModel
 from pydub import AudioSegment
+from transformers import Wav2Vec2FeatureExtractor, HubertModel as TrHubertModel
 
 from lib.rvc.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
 from lib.rvc.pipeline import VocalConvertPipeline
@@ -21,8 +22,11 @@ AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
 EMBEDDERS_LIST = {
-    "hubert_base": ("hubert_base.pt", "hubert_base"),
-    "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec"),
+    "hubert_base": ("hubert_base.pt", "hubert_base", "local"),
+    "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec", "local"),
+    "distilhubert": ("ntu-spml/distilhubert", "distilhubert", "hf"),
+    # "distilhubert-ja": ("TylorShine/distilhubert-ft-japanese-50k", "distilhubert-ja", "hf"),
+    # "distilhubert-ja_dev": ("models/pretrained/feature_extractors/distilhubert-ja-en", "distilhubert-ja_dev", "tr-local"),
 }
 
 
@@ -118,9 +122,14 @@ class VoiceConvertModel:
             embedder_model == None
             or loaded_embedder_model != EMBEDDERS_LIST[embedder_model_name][1]
         ):
-            print(f"load {embedder_model_name} embedder")
-            embedder_filename, embedder_name = get_embedder(embedder_model_name)
-            load_embedder(embedder_filename, embedder_name)
+            print(f"load {embedder_model_name} embedder")    
+            embedder_filename, embedder_name, load_from = get_embedder(embedder_model_name)
+            if load_from == "hf":
+                load_transformers_hubert(embedder_filename, embedder_name)
+            elif load_from == "tr-local":
+                load_transformers_hubert_local(embedder_filename, embedder_name)
+            else:
+                load_embedder(embedder_filename, embedder_name)
 
         f0 = self.weight.get("f0", 1)
 
@@ -243,14 +252,16 @@ def get_embedder(embedder_name):
     return None
 
 
-def load_embedder(emb_file, emb_name):
+def load_embedder(emb_file: str, emb_name: str):
     global embedder_model, loaded_embedder_model
+    emb_file = os.path.join(MODELS_DIR, emb_file)
     models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
-        [os.path.join(MODELS_DIR, emb_file)],
+        [emb_file],
         suffix="",
     )
     embedder_model = models[0]
     embedder_model = embedder_model.to(device)
+
     if is_half:
         embedder_model = embedder_model.half()
     else:
@@ -259,6 +270,39 @@ def load_embedder(emb_file, emb_name):
 
     loaded_embedder_model = emb_name
 
+
+def load_transformers_hubert(repo_name: str, emb_name: str):
+    global embedder_model, loaded_embedder_model
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_name)
+    embedder = TrHubertModel.from_pretrained(repo_name).to(device)
+    
+    if is_half:
+        embedder = embedder.half()
+    else:
+        embedder = embedder.float()
+    embedder.eval()
+    
+    embedder_model = (feature_extractor, embedder)
+    
+    loaded_embedder_model = emb_name
+
+
+def load_transformers_hubert_local(emb_file: str, emb_name: str):
+    global embedder_model, loaded_embedder_model
+    emb_file = os.path.join(ROOT_DIR, emb_file)
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(emb_file, local_files_only=True)
+    embedder = TrHubertModel.from_pretrained(emb_file, local_files_only=True).to(device)
+    
+    if is_half:
+        embedder = embedder.half()
+    else:
+        embedder = embedder.float()
+    embedder.eval()
+    
+    embedder_model = (feature_extractor, embedder)
+    
+    loaded_embedder_model = emb_name
+        
 
 def get_vc_model(model_name: str):
     model_path = os.path.join(MODELS_DIR, "checkpoints", model_name)

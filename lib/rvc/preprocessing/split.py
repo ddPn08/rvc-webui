@@ -37,6 +37,14 @@ def norm_write(
         tmp_audio = (tmp_audio / np.abs(tmp_audio).max() * (max * alpha)) + (
             1 - alpha
         ) * tmp_audio
+    else:
+        # clip level to max (cause sometimes when floating point decoding)
+        audio_min = np.min(tmp_audio)
+        if audio_min < -max:
+            tmp_audio = tmp_audio / -audio_min * max
+        audio_max = np.max(tmp_audio)
+        if audio_max > max:
+            tmp_audio = tmp_audio / audio_max  * max
 
     wavfile.write(
         os.path.join(outdir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
