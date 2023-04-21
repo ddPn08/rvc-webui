@@ -1,8 +1,7 @@
 gradio==3.25.0
 tqdm==4.65.0
 numpy==1.23.5
-faiss-cpu==1.7.0; sys_platform == "darwin"
-faiss-cpu==1.7.2; sys_platform != "darwin"
+faiss-cpu==1.7.3
 fairseq==0.12.2
 matplotlib==3.7.1
 scipy==1.9.3
