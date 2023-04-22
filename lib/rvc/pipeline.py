@@ -1,17 +1,18 @@
-from typing import *
 import os
 import traceback
+from typing import *
 
 import faiss
-# from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
-from fairseq.models.hubert import HubertModel
 import numpy as np
 import parselmouth
 import pyworld
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
-from transformers import Wav2Vec2FeatureExtractor, HubertModel as TrHubertModel
+# from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
+from fairseq.models.hubert import HubertModel
+from transformers import HubertModel as TrHubertModel
+from transformers import Wav2Vec2FeatureExtractor
 
 from .models import SynthesizerTrnMs256NSFSid
 

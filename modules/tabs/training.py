@@ -66,8 +66,10 @@ class Training(Tab):
 
             yield "Extracting features..."
 
-            embedder_filepath, _, embedder_load_from = models.get_embedder(embedder_name)
-            
+            embedder_filepath, _, embedder_load_from = models.get_embedder(
+                embedder_name
+            )
+
             if embedder_load_from == "local":
                 embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
 
@@ -149,8 +151,10 @@ class Training(Tab):
 
             yield "Extracting features..."
 
-            embedder_filepath, _, embedder_load_from = models.get_embedder(embedder_name)
-            
+            embedder_filepath, _, embedder_load_from = models.get_embedder(
+                embedder_name
+            )
+
             if embedder_load_from == "local":
                 embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
 

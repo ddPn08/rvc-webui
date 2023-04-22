@@ -10,7 +10,8 @@ import torch
 import torch.nn.functional as F
 from fairseq import checkpoint_utils
 from tqdm import tqdm
-from transformers import Wav2Vec2FeatureExtractor, HubertModel as TrHubertModel
+from transformers import HubertModel as TrHubertModel
+from transformers import Wav2Vec2FeatureExtractor
 
 from modules import shared
 

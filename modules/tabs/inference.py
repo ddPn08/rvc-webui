@@ -28,7 +28,7 @@ def inference_options_ui():
                     # "distilhubert-ja_dev",
                 ],
                 value="contentvec",
-                label="Embedder Model"
+                label="Embedder Model",
             )
         with gr.Column():
             auto_load_index = gr.Checkbox(value=False, label="Auto Load Index")
