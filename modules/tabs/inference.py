@@ -20,7 +20,16 @@ def inference_options_ui():
                 label="Pitch Extraction Algorithm",
             )
             embedder_model = gr.Radio(
-                choices=["hubert_base", "contentvec"], value="contentvec", label="Embedder Model"
+                choices=[
+                    "auto",
+                    "hubert_base",
+                    "contentvec",
+                    "distilhubert",
+                    # "distilhubert-ja",
+                    # "distilhubert-ja_dev",
+                ],
+                value="auto",
+                label="Embedder Model",
             )
         with gr.Column():
             auto_load_index = gr.Checkbox(value=False, label="Auto Load Index")

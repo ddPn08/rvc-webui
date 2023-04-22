@@ -66,11 +66,17 @@ class Training(Tab):
 
             yield "Extracting features..."
 
-            embedder_filepath, _ = models.get_embedder(embedder_name)
+            embedder_filepath, _, embedder_load_from = models.get_embedder(
+                embedder_name
+            )
+
+            if embedder_load_from == "local":
+                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
 
             extract_feature.run(
                 training_dir,
                 embedder_filepath,
+                embedder_load_from,
                 embedding_channels == 768,
                 None,
                 device,
@@ -145,11 +151,17 @@ class Training(Tab):
 
             yield "Extracting features..."
 
-            embedder_filepath, _ = models.get_embedder(embedder_name)
+            embedder_filepath, _, embedder_load_from = models.get_embedder(
+                embedder_name
+            )
+
+            if embedder_load_from == "local":
+                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
 
             extract_feature.run(
                 training_dir,
-                os.path.join(MODELS_DIR, embedder_filepath),
+                embedder_filepath,
+                embedder_load_from,
                 embedding_channels == 768,
                 gpu_ids,
             )
@@ -217,6 +229,9 @@ class Training(Tab):
                             choices=[
                                 "hubert_base",
                                 "contentvec",
+                                "distilhubert",
+                                # "distilhubert-ja",    # temporary
+                                # "distilhubert-ja_dev",
                             ],
                             value="hubert_base",
                             label="Using phone embedder",

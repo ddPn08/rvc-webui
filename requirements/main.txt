@@ -12,6 +12,7 @@ soundfile==0.12.1
 ffmpeg-python==0.2.0
 pydub==0.25.1
 soxr==0.3.5
+transformers==4.28.1
 
 tensorboard
 tensorboardX

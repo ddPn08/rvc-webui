@@ -1,16 +1,18 @@
-from typing import *
 import os
 import traceback
+from typing import *
 
 import faiss
-# from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
-from fairseq.models.hubert import HubertModel
 import numpy as np
 import parselmouth
 import pyworld
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
+# from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
+from fairseq.models.hubert import HubertModel
+from transformers import HubertModel as TrHubertModel
+from transformers import Wav2Vec2FeatureExtractor
 
 from .models import SynthesizerTrnMs256NSFSid
 
@@ -98,13 +100,13 @@ class VocalConvertPipeline(object):
 
     def _convert(
         self,
-        model: HubertModel,
+        model: Union[HubertModel, Tuple[Wav2Vec2FeatureExtractor, TrHubertModel]],
         net_g: SynthesizerTrnMs256NSFSid,
         sid: int,
         audio: np.ndarray,
         pitch: np.ndarray,
         pitchf: np.ndarray,
-        index,
+        index: faiss.IndexIVFFlat,
         big_npy: np.ndarray,
         index_rate: float,
     ):
@@ -120,27 +122,39 @@ class VocalConvertPipeline(object):
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
 
         is_feats_dim_768 = net_g.emb_channels == 768
-
-        inputs = (
-            {
-                "source": feats.to(self.device),
-                "padding_mask": padding_mask,
-                "output_layer": 9,  # layer 9
-            }
-            if not is_feats_dim_768
-            else {
-                "source": feats.to(self.device),
-                "padding_mask": padding_mask,
-                # no pass "output_layer"
-            }
-        )
-
-        with torch.no_grad():
-            logits = model.extract_features(**inputs)
-            if is_feats_dim_768:
-                feats = logits[0]
+        
+        if isinstance(model, tuple):
+            feats = model[0](feats.squeeze(0).squeeze(0).to(self.device), return_tensors="pt", sampling_rate=16000)
+            if self.is_half:
+                feats = feats.input_values.to(self.device).half()
             else:
-                feats = model.final_proj(logits[0])
+                feats = feats.input_values.to(self.device)
+            with torch.no_grad():
+                if is_feats_dim_768:
+                    feats = model[1](feats).last_hidden_state
+                else:
+                    feats = model[1](feats).extract_features
+        else:
+            inputs = (
+                {
+                    "source": feats.to(self.device),
+                    "padding_mask": padding_mask,
+                    "output_layer": 9,  # layer 9
+                }
+                if not is_feats_dim_768
+                else {
+                    "source": feats.to(self.device),
+                    "padding_mask": padding_mask,
+                    # no pass "output_layer"
+                }
+            )
+
+            with torch.no_grad():
+                logits = model.extract_features(**inputs)
+                if is_feats_dim_768:
+                    feats = logits[0]
+                else:
+                    feats = model.final_proj(logits[0])
 
         if (
             isinstance(index, type(None)) == False
@@ -192,7 +206,7 @@ class VocalConvertPipeline(object):
 
     def __call__(
         self,
-        model: HubertModel,
+        model: Union[HubertModel, Tuple[Wav2Vec2FeatureExtractor, TrHubertModel]],
         net_g: SynthesizerTrnMs256NSFSid,
         sid: int,
         audio: np.ndarray,
