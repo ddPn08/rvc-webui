@@ -21,13 +21,14 @@ def inference_options_ui():
             )
             embedder_model = gr.Radio(
                 choices=[
+                    "auto",
                     "hubert_base",
                     "contentvec",
                     "distilhubert",
                     # "distilhubert-ja",
                     # "distilhubert-ja_dev",
                 ],
-                value="contentvec",
+                value="auto",
                 label="Embedder Model",
             )
         with gr.Column():

@@ -71,7 +71,7 @@ class VoiceConvertModel:
     def __init__(self, model_name: str, state_dict: Dict[str, Any]) -> None:
         update_state_dict(state_dict)
         self.model_name = model_name
-        self.weight = state_dict
+        self.state_dict = state_dict
         self.tgt_sr = state_dict["params"]["sr"]
         f0 = state_dict.get("f0", 1)
         state_dict["params"]["spk_embed_dim"] = state_dict["weight"][
@@ -117,6 +117,14 @@ class VoiceConvertModel:
             raise Exception("You need to set Source Audio")
         f0_up_key = int(f0_up_key)
         audio = load_audio(input_audio, 16000)
+        if embedder_model_name == "auto":
+            embedder_model_name = (
+                self.state_dict["embedder_name"]
+                if "embedder_name" in self.state_dict
+                else "hubert_base"
+            )
+            if embedder_model_name.endswith("768"):
+                embedder_model_name = embedder_model_name[:-3]
         if not embedder_model_name in EMBEDDERS_LIST.keys():
             raise Exception(f"Not supported embedder: {embedder_model_name}")
         if (
@@ -134,7 +142,7 @@ class VoiceConvertModel:
             else:
                 load_embedder(embedder_filename, embedder_name)
 
-        f0 = self.weight.get("f0", 1)
+        f0 = self.state_dict.get("f0", 1)
 
         if not faiss_index_file and auto_load_index:
             faiss_index_file = self.get_index_path(sid)
