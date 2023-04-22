@@ -44,7 +44,7 @@ def norm_write(
             tmp_audio = tmp_audio / -audio_min * max
         audio_max = np.max(tmp_audio)
         if audio_max > max:
-            tmp_audio = tmp_audio / audio_max  * max
+            tmp_audio = tmp_audio / audio_max * max
 
     wavfile.write(
         os.path.join(outdir, f"{speaker_id:05}", f"{idx0}_{idx1}.wav"),
@@ -162,12 +162,23 @@ def preprocess_audio(
 
     all = [(i, x) for i, x in enumerate(sorted(datasets, key=operator.itemgetter(0)))]
 
+    # n of datasets per process
+    process_all_nums = [len(all) // num_processes] * num_processes
+    # add residual datasets
+    for i in range(len(all) % num_processes):
+        process_all_nums[i] += 1
+
+    assert len(all) == sum(process_all_nums), print(
+        f"len(all): {len(all)}, sum(process_all_nums): {sum(process_all_nums)}"
+    )
+
     with ProcessPoolExecutor(max_workers=num_processes) as executor:
+        all_index = 0
         for i in range(num_processes):
-            data = all[i::num_processes]
+            data = all[all_index : all_index + process_all_nums[i]]
             slicer = Slicer(
                 sr=sampling_rate,
-                threshold=-32,
+                threshold=-40,
                 min_length=800,
                 min_interval=400,
                 hop_size=15,
@@ -183,6 +194,7 @@ def preprocess_audio(
                 is_normalize,
                 process_id=i,
             )
+            all_index += process_all_nums[i]
 
     mute_wav = os.path.join(
         MODELS_DIR,
