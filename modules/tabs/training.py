@@ -7,7 +7,7 @@ import gradio as gr
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
 from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
-from modules.shared import MODELS_DIR, device
+from modules.shared import MODELS_DIR
 from modules.ui import Tab
 
 SR_DICT = {
@@ -31,6 +31,7 @@ class Training(Tab):
             f0,
             dataset_glob,
             speaker_id,
+            gpu_id,
             num_cpu_process,
             norm_audio_when_preprocess,
             pitch_extraction_algo,
@@ -42,6 +43,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
             yield f"Training directory: {training_dir}"
 
             if os.path.exists(training_dir) and ignore_cache:
@@ -78,8 +80,7 @@ class Training(Tab):
                 embedder_filepath,
                 embedder_load_from,
                 embedding_channels == 768,
-                None,
-                device,
+                gpu_ids,
             )
 
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
@@ -304,6 +305,7 @@ class Training(Tab):
                 f0,
                 dataset_glob,
                 speaker_id,
+                gpu_id,
                 num_cpu_process,
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
