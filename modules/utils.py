@@ -5,6 +5,7 @@ import ffmpeg
 import numpy as np
 import requests
 import torch
+from tqdm import tqdm
 
 from lib.rvc.config import TrainConfig
 from modules.shared import ROOT_DIR
@@ -35,9 +36,21 @@ def get_gpus():
 
 
 def donwload_file(url, out):
-    req = requests.get(url, allow_redirects=True)
+    req = requests.get(url, stream=True, allow_redirects=True)
+    content_length = req.headers.get("content-length")
+    progress_bar = tqdm(
+        total=int(content_length) if content_length is not None else None,
+        unit="B",
+        unit_scale=True,
+        unit_divisor=1024,
+    )
+
+    # with tqdm
     with open(out, "wb") as f:
-        f.write(req.content)
+        for chunk in req.iter_content(chunk_size=1024):
+            if chunk:
+                progress_bar.update(len(chunk))
+                f.write(chunk)
 
 
 def load_config(training_dir: str, sample_rate: str, emb_channels: int):
