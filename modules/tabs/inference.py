@@ -1,3 +1,5 @@
+import glob
+import os
 import traceback
 
 import gradio as gr
@@ -6,10 +8,13 @@ from modules import models, ui
 from modules.ui import Tab
 
 
-def inference_options_ui():
+def inference_options_ui(show_out_dir=True):
     with gr.Row().style(equal_height=False):
         with gr.Column():
             source_audio = gr.Textbox(label="Source Audio")
+            out_dir = gr.Textbox(
+                label="Out folder (Batch processing only)", visible=show_out_dir
+            )
         with gr.Column():
             transpose = gr.Slider(
                 minimum=-20, maximum=20, value=0, step=1, label="Transpose"
@@ -47,6 +52,7 @@ def inference_options_ui():
 
     return (
         source_audio,
+        out_dir,
         transpose,
         embedder_model,
         pitch_extraction_algo,
@@ -69,6 +75,7 @@ class Inference(Tab):
         def infer(
             sid,
             input_audio,
+            out_dir,
             embedder_model,
             f0_up_key,
             f0_file,
@@ -81,18 +88,39 @@ class Inference(Tab):
             model = models.vc_model
             try:
                 yield "Infering...", None
-                audio = model.single(
-                    sid,
-                    input_audio,
-                    embedder_model,
-                    f0_up_key,
-                    f0_file,
-                    f0_method,
-                    auto_load_index,
-                    faiss_index_file,
-                    big_npy_file,
-                    index_rate,
-                )
+
+                if out_dir == "":
+                    out_dir = None
+
+                if "*" in input_audio:
+                    assert (
+                        out_dir is not None
+                    ), "Out folder is required for batch processing"
+                    files = glob.glob(input_audio, recursive=True)
+                elif os.path.isdir(input_audio):
+                    assert (
+                        out_dir is not None
+                    ), "Out folder is required for batch processing"
+                    files = glob.glob(
+                        os.path.join(input_audio, "**", "*.wav"), recursive=True
+                    )
+                else:
+                    files = [input_audio]
+                for file in files:
+                    print(file)
+                    audio = model.single(
+                        sid,
+                        file,
+                        embedder_model,
+                        f0_up_key,
+                        f0_file,
+                        f0_method,
+                        auto_load_index,
+                        faiss_index_file,
+                        big_npy_file,
+                        index_rate,
+                        output_dir=out_dir,
+                    )
                 yield "Success", (model.tgt_sr, audio)
             except:
                 yield "Error: " + traceback.format_exc(), None
@@ -104,6 +132,7 @@ class Inference(Tab):
 
                     (
                         source_audio,
+                        out_dir,
                         transpose,
                         embedder_model,
                         pitch_extraction_algo,
@@ -127,6 +156,7 @@ class Inference(Tab):
             inputs=[
                 speaker_id,
                 source_audio,
+                out_dir,
                 embedder_model,
                 transpose,
                 f0_curve_file,

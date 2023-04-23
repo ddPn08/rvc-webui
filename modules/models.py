@@ -112,6 +112,7 @@ class VoiceConvertModel:
         faiss_index_file: str,
         big_npy_file: str,
         index_rate: float,
+        output_dir: str = AUDIO_OUT_DIR,
     ):
         if not input_audio:
             raise Exception("You need to set Source Audio")
@@ -169,11 +170,11 @@ class VoiceConvertModel:
             sample_width=2,
             channels=1,
         )
-        os.makedirs(AUDIO_OUT_DIR, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
         input_audio_splitext = os.path.splitext(os.path.basename(input_audio))[0]
         model_splitext = os.path.splitext(self.model_name)[0]
         index = 0
-        existing_files = os.listdir(AUDIO_OUT_DIR)
+        existing_files = os.listdir(output_dir)
         for existing_file in existing_files:
             result = re.match(r"\d+", existing_file)
             if result:
@@ -182,7 +183,7 @@ class VoiceConvertModel:
                     index = prefix_num
         audio.export(
             os.path.join(
-                AUDIO_OUT_DIR, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"
+                output_dir, f"{index+1}-{model_splitext}-{input_audio_splitext}.wav"
             ),
             format="wav",
         )
