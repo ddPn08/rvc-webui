@@ -13,7 +13,7 @@ def inference_options_ui(show_out_dir=True):
         with gr.Column():
             source_audio = gr.Textbox(label="Source Audio")
             out_dir = gr.Textbox(
-                label="Out folder (Batch processing only)", visible=show_out_dir
+                label="Out folder", visible=show_out_dir, placeholder=models.AUDIO_OUT_DIR
             )
         with gr.Column():
             transpose = gr.Slider(
@@ -88,9 +88,8 @@ class Inference(Tab):
             model = models.vc_model
             try:
                 yield "Infering...", None
-
                 if out_dir == "":
-                    out_dir = None
+                    out_dir = models.AUDIO_OUT_DIR
 
                 if "*" in input_audio:
                     assert (
