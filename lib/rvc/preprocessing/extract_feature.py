@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import os
 import traceback
 from concurrent.futures import ProcessPoolExecutor
@@ -210,7 +211,9 @@ def run(
             process_id=0,
         )
     else:
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(
+            mp_context=mp.get_context("spawn")
+        ) as executor:
             for i, id in enumerate(gpu_ids):
                 executor.submit(
                     processor,
