@@ -1,6 +1,6 @@
 import os
 import traceback
-from concurrent import futures
+import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 from typing import *
 
@@ -14,6 +14,8 @@ from transformers import HubertModel as TrHubertModel
 from transformers import Wav2Vec2FeatureExtractor
 
 from modules import shared
+
+mp.set_start_method("spawn")
 
 
 def load_embedder(embedder_path: str, device):
