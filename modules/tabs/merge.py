@@ -276,6 +276,7 @@ class Merge(Tab):
                         )
                     (
                         source_audio,
+                        _,
                         transpose,
                         embedder_name,
                         pitch_extraction_algo,
@@ -284,7 +285,7 @@ class Merge(Tab):
                         big_npy_file,
                         retrieval_feature_ratio,
                         fo_curve_file,
-                    ) = inference_options_ui()
+                    ) = inference_options_ui(show_out_dir=False)
 
                 with gr.Row().style(equal_height=False):
                     with gr.Column():

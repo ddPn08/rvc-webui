@@ -107,7 +107,6 @@ class Inference(Tab):
                 else:
                     files = [input_audio]
                 for file in files:
-                    print(file)
                     audio = model.single(
                         sid,
                         file,
@@ -121,7 +120,7 @@ class Inference(Tab):
                         index_rate,
                         output_dir=out_dir,
                     )
-                yield "Success", (model.tgt_sr, audio)
+                yield "Success", (model.tgt_sr, audio) if len(files) == 1 else None
             except:
                 yield "Error: " + traceback.format_exc(), None
 
