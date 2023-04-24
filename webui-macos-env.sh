@@ -9,7 +9,7 @@ then
     python_cmd="python3.10"
 fi
 
-export COMMANDLINE_ARGS="--skip-torch-cuda-test"
+export COMMANDLINE_ARGS=""
 export TORCH_COMMAND="pip install torch torchvision torchaudio"
 export PYTORCH_ENABLE_MPS_FALLBACK=1
 

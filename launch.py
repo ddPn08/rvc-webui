@@ -121,7 +121,6 @@ def prepare_environment():
     if skip_install:
         return
 
-    sys.argv, skip_torch_cuda_test = extract_arg(sys.argv, "--skip-torch-cuda-test")
     sys.argv, reinstall_torch = extract_arg(sys.argv, "--reinstall-torch")
     ngrok = "--ngrok" in sys.argv
 
@@ -130,11 +129,6 @@ def prepare_environment():
             f'"{python}" -m {torch_command}',
             "Installing torch and torchvision",
             "Couldn't install torch",
-        )
-
-    if not skip_torch_cuda_test:
-        run_python(
-            "import torch; assert torch.cuda.is_available(), 'Torch is not able to use GPU; add --skip-torch-cuda-test to COMMANDLINE_ARGS variable to disable this check'"
         )
 
     if not is_installed("pyngrok") and ngrok:
