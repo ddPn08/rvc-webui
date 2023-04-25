@@ -297,6 +297,32 @@ class Training(Tab):
                         train_index_button = gr.Button("Train Index", variant="primary")
                         train_all_button = gr.Button("Train", variant="primary")
 
+        def change_pretrained(sr, f0, emb_channels):
+            f0 = f0 == "Yes"
+            g = f"f0G{sr}{emb_channels}.pth" if f0 else f"G{sr}{emb_channels}.pth"
+            d = f"f0D{sr}{emb_channels}.pth" if f0 else f"D{sr}{emb_channels}.pth"
+
+            return gr.Textbox.update(
+                value=os.path.join(MODELS_DIR, "pretrained", g)
+            ), gr.Textbox.update(value=os.path.join(MODELS_DIR, "pretrained", d))
+
+        change_pretrained_options = {
+            "fn": change_pretrained,
+            "inputs": [
+                target_sr,
+                f0,
+                embedding_channels,
+            ],
+            "outputs": [
+                pre_trained_generator,
+                pre_trained_discriminator,
+            ],
+        }
+
+        target_sr.change(**change_pretrained_options)
+        f0.change(**change_pretrained_options)
+        embedding_channels.change(**change_pretrained_options)
+
         train_index_button.click(
             train_index_only,
             inputs=[

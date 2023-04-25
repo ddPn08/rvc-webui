@@ -35,7 +35,7 @@ def get_gpus():
     return [torch.device(f"cuda:{i}") for i in range(num_gpus)]
 
 
-def donwload_file(url, out):
+def download_file(url: str, out: str, position: int = 0):
     req = requests.get(url, stream=True, allow_redirects=True)
     content_length = req.headers.get("content-length")
     progress_bar = tqdm(
@@ -43,6 +43,7 @@ def donwload_file(url, out):
         unit="B",
         unit_scale=True,
         unit_divisor=1024,
+        position=position,
     )
 
     # with tqdm
