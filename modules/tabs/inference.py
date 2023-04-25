@@ -13,7 +13,9 @@ def inference_options_ui(show_out_dir=True):
         with gr.Column():
             source_audio = gr.Textbox(label="Source Audio")
             out_dir = gr.Textbox(
-                label="Out folder", visible=show_out_dir, placeholder=models.AUDIO_OUT_DIR
+                label="Out folder",
+                visible=show_out_dir,
+                placeholder=models.AUDIO_OUT_DIR,
             )
         with gr.Column():
             transpose = gr.Slider(
