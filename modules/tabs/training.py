@@ -157,7 +157,9 @@ class Training(Tab):
             )
 
             if embedder_load_from == "local":
-                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
+                embedder_filepath = os.path.join(
+                    MODELS_DIR, "embeddings", embedder_filepath
+                )
 
             extract_feature.run(
                 training_dir,
@@ -268,7 +270,7 @@ class Training(Tab):
                             label="Pitch extraction algorithm",
                         )
                     with gr.Row().style(equal_height=False):
-                        batch_size = gr.Number(value=4, step=1, label="Batch size")
+                        batch_size = gr.Number(value=4, label="Batch size")
                         num_epochs = gr.Number(
                             value=30,
                             label="Number of epochs",
@@ -284,11 +286,15 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0G40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "f0G40k256.pth"
+                            ),
                         )
                         pre_trained_discriminator = gr.Textbox(
                             label="Pre trained discriminator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0D40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "f0D40k256.pth"
+                            ),
                         )
 
                     with gr.Row().style(equal_height=False):

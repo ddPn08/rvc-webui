@@ -35,22 +35,25 @@ def get_gpus():
     return [torch.device(f"cuda:{i}") for i in range(num_gpus)]
 
 
-def download_file(url: str, out: str, position: int = 0):
+def download_file(url: str, out: str, position: int = 0, show: bool = True):
     req = requests.get(url, stream=True, allow_redirects=True)
     content_length = req.headers.get("content-length")
-    progress_bar = tqdm(
-        total=int(content_length) if content_length is not None else None,
-        unit="B",
-        unit_scale=True,
-        unit_divisor=1024,
-        position=position,
-    )
+    if show:
+        progress_bar = tqdm(
+            total=int(content_length) if content_length is not None else None,
+            leave=False,
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            position=position,
+        )
 
     # with tqdm
     with open(out, "wb") as f:
         for chunk in req.iter_content(chunk_size=1024):
             if chunk:
-                progress_bar.update(len(chunk))
+                if show:
+                    progress_bar.update(len(chunk))
                 f.write(chunk)
 
 

@@ -1,6 +1,5 @@
 import os
 import re
-from concurrent.futures import ProcessPoolExecutor
 from typing import *
 
 import torch
@@ -15,7 +14,7 @@ from lib.rvc.pipeline import VocalConvertPipeline
 
 from .cmd_opts import opts
 from .shared import ROOT_DIR, device, is_half
-from .utils import download_file, load_audio
+from .utils import load_audio
 
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
@@ -216,41 +215,6 @@ MODELS_DIR = opts.models_dir or os.path.join(ROOT_DIR, "models")
 vc_model: Optional[VoiceConvertModel] = None
 embedder_model: Optional[HubertModel] = None
 loaded_embedder_model = ""
-
-
-def download_models():
-    with ProcessPoolExecutor() as pool:
-        pos = 0
-        for template in [
-            "D{}k{}",
-            "G{}k{}",
-            "f0D{}k{}",
-            "f0G{}k{}",
-        ]:
-            for sr in ["32", "40", "48"]:
-                for emb_channels in ["256", "768"]:
-                    basename = template.format(sr, emb_channels)
-                    filename = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/{basename}.pth"
-                    out = os.path.join(MODELS_DIR, "pretrained", f"{basename}.pth")
-                    if os.path.exists(out):
-                        # TODO: Hash check
-                        continue
-                    pool.submit(download_file, filename, out, pos)
-                    pos += 1
-
-        for filename in [
-            "hubert_base.pt",
-            "checkpoint_best_legacy_500.pt",
-        ]:
-            out = os.path.join(MODELS_DIR, "embeddings", filename)
-            if not os.path.exists(out):
-                pool.submit(
-                    download_file,
-                    f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}",
-                    out,
-                    pos,
-                )
-                pos += 1
 
 
 def get_models():
