@@ -18,7 +18,7 @@ def write_config(
 
 def create_trained_model(
     weights: Dict[str, Any],
-    sr: int,
+    sr: str,
     f0: int,
     emb_name: str,
     emb_ch: int,
@@ -118,7 +118,7 @@ def create_trained_model(
 
 def save(
     model,
-    sr: int,
+    sr: str,
     f0: int,
     emb_name: str,
     emb_ch: int,

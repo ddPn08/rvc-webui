@@ -59,6 +59,7 @@ class TextEncoder(nn.Module):
         m, logs = torch.split(stats, self.out_channels, dim=1)
         return m, logs, x_mask
 
+
 class ResidualCouplingBlock(nn.Module):
     def __init__(
         self,
@@ -561,7 +562,14 @@ class SynthesizerTrnMs256NSFSid(nn.Module):
             inter_channels, hidden_channels, 5, 1, 3, gin_channels=gin_channels
         )
         self.emb_g = nn.Embedding(self.spk_embed_dim, gin_channels)
-        print("gin_channels:", gin_channels, "self.spk_embed_dim:", self.spk_embed_dim, "emb_channels:", emb_channels)
+        print(
+            "gin_channels:",
+            gin_channels,
+            "self.spk_embed_dim:",
+            self.spk_embed_dim,
+            "emb_channels:",
+            emb_channels,
+        )
 
     def remove_weight_norm(self):
         self.dec.remove_weight_norm()
@@ -672,7 +680,14 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
             inter_channels, hidden_channels, 5, 1, 3, gin_channels=gin_channels
         )
         self.emb_g = nn.Embedding(self.spk_embed_dim, gin_channels)
-        print("gin_channels:", gin_channels, "self.spk_embed_dim:", self.spk_embed_dim, "emb_channels:", emb_channels)
+        print(
+            "gin_channels:",
+            gin_channels,
+            "self.spk_embed_dim:",
+            self.spk_embed_dim,
+            "emb_channels:",
+            emb_channels,
+        )
 
     def remove_weight_norm(self):
         self.dec.remove_weight_norm()
@@ -697,6 +712,7 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
         z = self.flow(z_p, x_mask, g=g, reverse=True)
         o = self.dec((z * x_mask)[:, :, :max_len], g=g)
         return o, x_mask, (z, z_p, m_p, logs_p)
+
 
 class MultiPeriodDiscriminator(torch.nn.Module):
     def __init__(self, use_spectral_norm=False):

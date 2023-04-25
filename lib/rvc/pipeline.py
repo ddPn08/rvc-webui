@@ -9,6 +9,7 @@ import pyworld
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
+
 # from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
 from fairseq.models.hubert import HubertModel
 from transformers import HubertModel as TrHubertModel
@@ -122,9 +123,13 @@ class VocalConvertPipeline(object):
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
 
         is_feats_dim_768 = net_g.emb_channels == 768
-        
+
         if isinstance(model, tuple):
-            feats = model[0](feats.squeeze(0).squeeze(0).to(self.device), return_tensors="pt", sampling_rate=16000)
+            feats = model[0](
+                feats.squeeze(0).squeeze(0).to(self.device),
+                return_tensors="pt",
+                sampling_rate=16000,
+            )
             if self.is_half:
                 feats = feats.input_values.to(self.device).half()
             else:
@@ -273,6 +278,8 @@ class VocalConvertPipeline(object):
             pitch, pitchf = self.get_f0(audio_pad, p_len, transpose, f0_method, inp_f0)
             pitch = pitch[:p_len]
             pitchf = pitchf[:p_len]
+            if self.device.type == "mps":
+                pitchf = pitchf.astype(np.float32)
             pitch = torch.tensor(pitch, device=self.device).unsqueeze(0).long()
             pitchf = torch.tensor(pitchf, device=self.device).unsqueeze(0).float()
 

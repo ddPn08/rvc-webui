@@ -157,7 +157,9 @@ class Training(Tab):
             )
 
             if embedder_load_from == "local":
-                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
+                embedder_filepath = os.path.join(
+                    MODELS_DIR, "embeddings", embedder_filepath
+                )
 
             extract_feature.run(
                 training_dir,
@@ -268,7 +270,7 @@ class Training(Tab):
                             label="Pitch extraction algorithm",
                         )
                     with gr.Row().style(equal_height=False):
-                        batch_size = gr.Number(value=4, step=1, label="Batch size")
+                        batch_size = gr.Number(value=4, label="Batch size")
                         num_epochs = gr.Number(
                             value=30,
                             label="Number of epochs",
@@ -284,11 +286,15 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0G40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "f0G40k256.pth"
+                            ),
                         )
                         pre_trained_discriminator = gr.Textbox(
                             label="Pre trained discriminator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0D40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "f0D40k256.pth"
+                            ),
                         )
 
                     with gr.Row().style(equal_height=False):
@@ -296,6 +302,32 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         train_index_button = gr.Button("Train Index", variant="primary")
                         train_all_button = gr.Button("Train", variant="primary")
+
+        def change_pretrained(sr, f0, emb_channels):
+            f0 = f0 == "Yes"
+            g = f"f0G{sr}{emb_channels}.pth" if f0 else f"G{sr}{emb_channels}.pth"
+            d = f"f0D{sr}{emb_channels}.pth" if f0 else f"D{sr}{emb_channels}.pth"
+
+            return gr.Textbox.update(
+                value=os.path.join(MODELS_DIR, "pretrained", g)
+            ), gr.Textbox.update(value=os.path.join(MODELS_DIR, "pretrained", d))
+
+        change_pretrained_options = {
+            "fn": change_pretrained,
+            "inputs": [
+                target_sr,
+                f0,
+                embedding_channels,
+            ],
+            "outputs": [
+                pre_trained_generator,
+                pre_trained_discriminator,
+            ],
+        }
+
+        target_sr.change(**change_pretrained_options)
+        f0.change(**change_pretrained_options)
+        embedding_channels.change(**change_pretrained_options)
 
         train_index_button.click(
             train_index_only,

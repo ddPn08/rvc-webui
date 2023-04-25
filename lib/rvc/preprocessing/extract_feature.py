@@ -48,15 +48,19 @@ def load_transformers_hubert(repo_name: str, device):
     except Exception as e:
         print(f"Error: {e} {repo_name}")
         traceback.print_exc()
-    
+
     return (feature_extractor, embedder_model), None
 
 
 def load_transformers_hubert_local(embedder_path: str, device):
     try:
         embedder_path = os.path.join(shared.ROOT_DIR, embedder_path)
-        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(embedder_path, local_files_only=True)
-        embedder_model = TrHubertModel.from_pretrained(embedder_path, local_files_only=True).to(device)
+        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+            embedder_path, local_files_only=True
+        )
+        embedder_model = TrHubertModel.from_pretrained(
+            embedder_path, local_files_only=True
+        ).to(device)
         if device != "cpu":
             embedder_model = embedder_model.half()
         else:
@@ -65,7 +69,7 @@ def load_transformers_hubert_local(embedder_path: str, device):
     except Exception as e:
         print(f"Error: {e} {embedder_path}")
         traceback.print_exc()
-    
+
     return (feature_extractor, embedder_model), None
 
 
@@ -96,7 +100,7 @@ def processor(
 ):
     if embedder_load_from == "local" and not os.path.exists(embedder_path):
         return f"Embedder not found: {embedder_path}"
-    
+
     if embedder_load_from == "hf":
         model, cfg = load_transformers_hubert(embedder_path, device)
     elif embedder_load_from == "tr-local":
@@ -114,12 +118,16 @@ def processor(
                     continue
 
                 os.makedirs(os.path.dirname(out_filepath), exist_ok=True)
-                
+
                 is_normalize = False if cfg is None else cfg.task.normalize
                 feats = readwave(wav_filepath, normalize=is_normalize)
                 padding_mask = torch.BoolTensor(feats.shape).fill_(False)
                 if isinstance(model, tuple):
-                    feats = model[0](feats.squeeze(0).squeeze(0).to(device), return_tensors="pt", sampling_rate=16000)
+                    feats = model[0](
+                        feats.squeeze(0).squeeze(0).to(device),
+                        return_tensors="pt",
+                        sampling_rate=16000,
+                    )
                     if device != "cpu":
                         feats = feats.input_values.to(device).half()
                     else:
@@ -211,9 +219,7 @@ def run(
             process_id=0,
         )
     else:
-        with ProcessPoolExecutor(
-            mp_context=mp.get_context("spawn")
-        ) as executor:
+        with ProcessPoolExecutor(mp_context=mp.get_context("spawn")) as executor:
             for i, id in enumerate(gpu_ids):
                 executor.submit(
                     processor,

@@ -1,9 +1,6 @@
-import asyncio
 import os
-import posixpath
 import re
 from typing import *
-from urllib.parse import urlparse
 
 import torch
 from fairseq import checkpoint_utils
@@ -17,7 +14,7 @@ from lib.rvc.pipeline import VocalConvertPipeline
 
 from .cmd_opts import opts
 from .shared import ROOT_DIR, device, is_half
-from .utils import donwload_file, load_audio
+from .utils import load_audio
 
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
@@ -220,34 +217,6 @@ embedder_model: Optional[HubertModel] = None
 loaded_embedder_model = ""
 
 
-def download_models():
-    loop = asyncio.new_event_loop()
-    tasks = []
-    for template in [
-        "D{}k",
-        "G{}k",
-        "f0D{}k",
-        "f0G{}k",
-    ]:
-        for sr in ["32", "40", "48"]:
-            url = f"https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/{template.format(sr)}.pth"
-            out = os.path.join(MODELS_DIR, "pretrained", f"{template.format(sr)}.pth")
-            if os.path.exists(out):
-                continue
-            tasks.append(loop.run_in_executor(None, donwload_file, url, out))
-
-    if len(tasks) > 0:
-        loop.run_until_complete(asyncio.gather(*tasks))
-
-    for url in [
-        "https://huggingface.co/ddPn08/rvc_pretrained/resolve/main/hubert_base.pt",
-        "https://huggingface.co/innnky/contentvec/resolve/main/checkpoint_best_legacy_500.pt",
-    ]:
-        out = os.path.join(MODELS_DIR, posixpath.basename(urlparse(url).path))
-        if not os.path.exists(out):
-            donwload_file(url, out)
-
-
 def get_models():
     dir = os.path.join(ROOT_DIR, "models", "checkpoints")
     os.makedirs(dir, exist_ok=True)
@@ -266,7 +235,7 @@ def get_embedder(embedder_name):
 
 def load_embedder(emb_file: str, emb_name: str):
     global embedder_model, loaded_embedder_model
-    emb_file = os.path.join(MODELS_DIR, emb_file)
+    emb_file = os.path.join(MODELS_DIR, "embeddings", emb_file)
     models, _, _ = checkpoint_utils.load_model_ensemble_and_task(
         [emb_file],
         suffix="",
