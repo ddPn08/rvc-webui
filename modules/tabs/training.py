@@ -114,7 +114,6 @@ class Training(Tab):
             embedder_name,
             embedding_channels,
             ignore_cache,
-            vc_client_compatible,
         ):
             batch_size = int(batch_size)
             num_epochs = int(num_epochs)
@@ -123,10 +122,6 @@ class Training(Tab):
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
-
-            if embedding_channels == 768 and vc_client_compatible:
-                yield "Error: 768 dim embedder is not compatible with VC client"
-                return
 
             if os.path.exists(training_dir) and ignore_cache:
                 shutil.rmtree(training_dir)
@@ -195,7 +190,6 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
-                vc_client_compatible=vc_client_compatible,
             )
 
             yield "Training index..."
@@ -243,9 +237,6 @@ class Training(Tab):
                             choices=["256", "768"],
                             value="256",
                             label="Embedding channels",
-                        )
-                        vc_client_compatible = gr.Checkbox(
-                            label="VC Client compatible", value=True
                         )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
@@ -369,7 +360,6 @@ class Training(Tab):
                 embedder_name,
                 embedding_channels,
                 ignore_cache,
-                vc_client_compatible,
             ],
             outputs=[status],
         )

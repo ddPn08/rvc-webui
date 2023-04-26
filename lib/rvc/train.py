@@ -179,7 +179,6 @@ def train_model(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
-    vc_client_compatible: bool = False,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(utils.find_empty_port())
@@ -214,7 +213,6 @@ def train_model(
             pretrain_d,
             embedder_name,
             save_only_last,
-            vc_client_compatible,
         ),
     )
 
@@ -248,7 +246,6 @@ def training_runner(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
-    vc_client_compatible: bool = False,
 ):
     config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
@@ -686,7 +683,6 @@ def training_runner(
                 embedder_out_channels,
                 os.path.join(training_dir, "checkpoints", f"{model_name}-{epoch}.pth"),
                 epoch,
-                vc_client_compatible=vc_client_compatible,
             )
 
         scheduler_g.step()
@@ -702,5 +698,4 @@ def training_runner(
             embedder_out_channels,
             os.path.join(out_dir, f"{model_name}.pth"),
             epoch,
-            vc_client_compatible=vc_client_compatible,
         )
