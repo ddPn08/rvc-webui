@@ -22,8 +22,8 @@ class VocalConvertPipeline(object):
     def __init__(self, tgt_sr: int, device: Union[str, torch.device], is_half: bool):
         self.x_pad = 3 if is_half else 1
         self.x_query = 10 if is_half else 6
-        self.x_center = 60 if is_half else 30
-        self.x_max = 65 if is_half else 32
+        self.x_center = 60 if is_half else 38
+        self.x_max = 65 if is_half else 41
 
         self.sr = 16000  # hubert input sample rate
         self.window = 160  # hubert input window
@@ -31,7 +31,7 @@ class VocalConvertPipeline(object):
         self.t_pad_tgt = tgt_sr * self.x_pad
         self.t_pad2 = self.t_pad * 2
         self.t_query = self.sr * self.x_query  # query time before and after query point
-        self.t_center = self.sr * self.x_query  # query cut point position
+        self.t_center = self.sr * self.x_center  # query cut point position
         self.t_max = self.sr * self.x_max  # max time for no query
         self.device = device
         self.is_half = is_half
