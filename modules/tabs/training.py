@@ -1,3 +1,4 @@
+import math
 import os
 import shutil
 from multiprocessing import cpu_count
@@ -248,7 +249,7 @@ class Training(Tab):
                             minimum=0,
                             maximum=cpu_count(),
                             step=1,
-                            value=cpu_count(),
+                            value=math.ceil(cpu_count() / 2),
                             label="Number of CPU processes",
                         )
                         norm_audio_when_preprocess = gr.Radio(
