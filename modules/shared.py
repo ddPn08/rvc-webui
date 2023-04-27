@@ -42,5 +42,3 @@ if not torch.cuda.is_available():
         device = "cpu"
 
 device = torch.device(device)
-
-vram = torch.cuda.get_device_properties(device).total_memory / 1024 ** 3
