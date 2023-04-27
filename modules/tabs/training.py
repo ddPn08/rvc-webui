@@ -7,7 +7,7 @@ import gradio as gr
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
 from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
-from modules.shared import MODELS_DIR
+from modules.shared import MODELS_DIR, half_support
 from modules.ui import Tab
 
 SR_DICT = {
@@ -109,6 +109,7 @@ class Training(Tab):
             cache_batch,
             num_epochs,
             save_every_epoch,
+            fp16,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
             embedder_name,
@@ -171,7 +172,7 @@ class Training(Tab):
             print(f"train_all: emb_name: {embedder_name}")
 
             config = utils.load_config(
-                training_dir, sampling_rate_str, embedding_channels
+                training_dir, sampling_rate_str, embedding_channels, fp16
             )
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
@@ -274,6 +275,9 @@ class Training(Tab):
                             label="Save every epoch",
                         )
                         cache_batch = gr.Checkbox(label="Cache batch", value=True)
+                        fp16 = gr.Checkbox(
+                            label="FP16", value=half_support, disabled=not half_support
+                        )
                     with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
@@ -355,6 +359,7 @@ class Training(Tab):
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
+                fp16,
                 pre_trained_generator,
                 pre_trained_discriminator,
                 embedder_name,

@@ -20,10 +20,28 @@ from .models import SynthesizerTrnMs256NSFSid
 
 class VocalConvertPipeline(object):
     def __init__(self, tgt_sr: int, device: Union[str, torch.device], is_half: bool):
-        self.x_pad = 3 if is_half else 1
-        self.x_query = 10 if is_half else 6
-        self.x_center = 60 if is_half else 38
-        self.x_max = 65 if is_half else 41
+        if isinstance(device, str):
+            device = torch.device(device)
+        if device.type == "cuda":
+            vram = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        else:
+            vram = None
+
+        if vram is not None and vram <= 4:
+            self.x_pad = 1
+            self.x_query = 5
+            self.x_center = 30
+            self.x_max = 32
+        elif vram <= 5:
+            self.x_pad = 1
+            self.x_query = 6
+            self.x_center = 38
+            self.x_max = 41
+        else:
+            self.x_pad = 3
+            self.x_query = 10
+            self.x_center = 60
+            self.x_max = 65
 
         self.sr = 16000  # hubert input sample rate
         self.window = 160  # hubert input window
