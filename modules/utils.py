@@ -72,3 +72,5 @@ def load_config(training_dir: str, sample_rate: str, emb_channels: int, fp16: bo
 
     with open(config_save_path, "w") as f:
         f.write(config.json())
+
+    return config
