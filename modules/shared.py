@@ -42,3 +42,11 @@ if not torch.cuda.is_available():
         device = "cpu"
 
 device = torch.device(device)
+<<<<<<< Updated upstream
+=======
+
+if device == torch.device("mps"):
+    vram = 0
+else:
+    vram = torch.cuda.get_device_properties(device).total_memory / 1024 ** 3
+>>>>>>> Stashed changes

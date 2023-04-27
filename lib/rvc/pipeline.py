@@ -9,7 +9,6 @@ import pyworld
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
-
 # from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
 from fairseq.models.hubert import HubertModel
 from transformers import HubertModel as TrHubertModel
@@ -32,7 +31,7 @@ class VocalConvertPipeline(object):
             self.x_query = 5
             self.x_center = 30
             self.x_max = 32
-        elif vram <= 5:
+        elif vram is not None and vram <= 5:
             self.x_pad = 1
             self.x_query = 6
             self.x_center = 38

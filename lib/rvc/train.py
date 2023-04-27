@@ -3,6 +3,7 @@ import json
 import operator
 import os
 import re
+import sys
 import time
 from random import shuffle
 from typing import *
@@ -19,23 +20,20 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+# パスが届かないので苦肉の策
+sys.path.append('../')
+from modules import shared
+
 from . import commons, utils
 from .checkpoints import save
 from .config import DatasetMetadata, TrainConfig
-from .data_utils import (
-    DistributedBucketSampler,
-    TextAudioCollate,
-    TextAudioCollateMultiNSFsid,
-    TextAudioLoader,
-    TextAudioLoaderMultiNSFsid,
-)
+from .data_utils import (DistributedBucketSampler, TextAudioCollate,
+                         TextAudioCollateMultiNSFsid, TextAudioLoader,
+                         TextAudioLoaderMultiNSFsid)
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import (
-    MultiPeriodDiscriminator,
-    SynthesizerTrnMs256NSFSid,
-    SynthesizerTrnMs256NSFSidNono,
-)
+from .models import (MultiPeriodDiscriminator, SynthesizerTrnMs256NSFSid,
+                     SynthesizerTrnMs256NSFSidNono)
 
 
 def glob_dataset(glob_str: str, speaker_id: int):
@@ -194,11 +192,11 @@ def train_model(
 
     start = time.perf_counter()
 
-    mp.spawn(
-        training_runner,
-        nprocs=len(gpus),
-        args=(
-            len(gpus),
+    # Mac(MPS)でやると、mp.spawnでなんかトラブルが出るので普通にtraining_runnerを呼び出す。
+    if shared.device == torch.device("mps"):
+        training_runner(
+            0, # rank
+            1, # world size
             config,
             training_dir,
             model_name,
@@ -213,8 +211,29 @@ def train_model(
             pretrain_d,
             embedder_name,
             save_only_last,
-        ),
-    )
+        )
+    else:
+        mp.spawn(
+            training_runner,
+            nprocs=len(gpus),
+            args=(
+                len(gpus),
+                config,
+                training_dir,
+                model_name,
+                out_dir,
+                sample_rate,
+                f0,
+                batch_size,
+                cache_batch,
+                total_epoch,
+                save_every_epoch,
+                pretrain_g,
+                pretrain_d,
+                embedder_name,
+                save_only_last,
+            ),
+        )
 
     end = time.perf_counter()
 
@@ -319,10 +338,14 @@ def training_runner(
 
     if torch.cuda.is_available():
         net_g = net_g.cuda(rank)
+    elif shared.device == torch.device("mps"):
+        net_g = net_g.to(device=shared.device)
 
     net_d = MultiPeriodDiscriminator(config.model.use_spectral_norm)
     if torch.cuda.is_available():
         net_d = net_d.cuda(rank)
+    elif shared.device == torch.device("mps"):
+        net_d = net_d.to(device=shared.device)
 
     optim_g = torch.optim.AdamW(
         net_g.parameters(),
@@ -340,6 +363,9 @@ def training_runner(
     if torch.cuda.is_available():
         net_g = DDP(net_g, device_ids=[rank])
         net_d = DDP(net_d, device_ids=[rank])
+    elif shared.device == torch.device("mps"):
+        # DDPなんかMacだとエラー出る…
+        None
     else:
         net_g = DDP(net_g)
         net_d = DDP(net_d)
@@ -388,11 +414,21 @@ def training_runner(
                     "to",
                     emb_phone_size,
                 )
-            net_g.module.load_state_dict(net_g_state)
+            if shared.device == torch.device("mps"):
+                # DDP通してないからか（？）moduleがないって言われる。下のnet_dも同様。
+                net_g.load_state_dict(net_g_state)
+            else:
+                net_g.module.load_state_dict(net_g_state)
             del net_g_state
-            net_d.module.load_state_dict(
-                torch.load(pretrain_d, map_location="cpu")["model"]
-            )
+
+            if shared.device == torch.device("mps"):
+                net_d.load_state_dict(
+                    torch.load(pretrain_d, map_location="cpu")["model"]
+                )
+            else:
+                net_d.module.load_state_dict(
+                    torch.load(pretrain_d, map_location="cpu")["model"]
+                )
             if is_main_process:
                 print(f"loaded pretrained {pretrain_g} {pretrain_d}")
 
@@ -473,6 +509,21 @@ def training_runner(
                     wave, wave_lengths = wave.cuda(
                         rank, non_blocking=True
                     ), wave_lengths.cuda(rank, non_blocking=True)
+                elif shared.device == torch.device("mps"):
+                    phone, phone_lengths = phone.to(
+                        device=shared.device, non_blocking=True
+                    ), phone_lengths.to(device=shared.device, non_blocking=True)
+                    if f0 == 1:
+                        pitch, pitchf = pitch.to(
+                            device=shared.device, non_blocking=True
+                        ), pitchf.to(device=shared.device, non_blocking=True)
+                    sid = sid.to(device=shared.device, non_blocking=True)
+                    spec, spec_lengths = spec.to(
+                        device=shared.device, non_blocking=True
+                    ), spec_lengths.to(device=shared.device, non_blocking=True)
+                    wave, wave_lengths = wave.to(
+                        device=shared.device, non_blocking=True
+                    ), wave_lengths.to(device=shared.device, non_blocking=True)
                 if cache_in_gpu:
                     if f0 == 1:
                         cache.append(
@@ -548,7 +599,7 @@ def training_runner(
                         config.data.mel_fmin,
                         config.data.mel_fmax,
                     )
-                if config.train.fp16_run == True:
+                if config.train.fp16_run == True and shared.device != torch.device("mps"):
                     y_hat_mel = y_hat_mel.half()
                 wave = commons.slice_segments(
                     wave, ids_slice * config.data.hop_length, config.train.segment_size

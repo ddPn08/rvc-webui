@@ -98,6 +98,10 @@ def processor(
     out_dir: str,
     process_id: int,
 ):
+    # なんかパスが違っていた。ので、アドホックに直している。
+    embedder_path= embedder_path.replace("rvc-webui/models/hubert_base.pt","rvc-webui/models/embeddings/hubert_base.pt")
+    embedder_path= embedder_path.replace("rvc-webui/models/checkpoint_best_legacy_500.pt","rvc-webui/models/embeddings/checkpoint_best_legacy_500.pt")
+
     if embedder_load_from == "local" and not os.path.exists(embedder_path):
         return f"Embedder not found: {embedder_path}"
 
@@ -128,20 +132,27 @@ def processor(
                         return_tensors="pt",
                         sampling_rate=16000,
                     )
-                    if device != "cpu":
+                    if device != torch.device("cpu"):
                         feats = feats.input_values.to(device).half()
                     else:
-                        feats = feats.input_values.to(device)
+                        feats = feats.input_values.to(device).float()
+ 
                     with torch.no_grad():
-                        if is_feats_dim_768:
-                            feats = model[1](feats).last_hidden_state
+                        if device != torch.device("cpu"):
+                            if is_feats_dim_768:
+                                feats = model[1](feats).last_hidden_state
+                            else:
+                                feats = model[1](feats).extract_features
                         else:
-                            feats = model[1](feats).extract_features
+                            if is_feats_dim_768:
+                                feats = model[1].float()(feats).last_hidden_state
+                            else:
+                                feats = model[1].float()(feats).extract_features
                 else:
                     inputs = (
                         {
                             "source": feats.half().to(device)
-                            if device != "cpu"
+                            if device != torch.device("cpu")
                             else feats.to(device),
                             "padding_mask": padding_mask.to(device),
                             "output_layer": 9,  # layer 9
@@ -149,12 +160,18 @@ def processor(
                         if not is_feats_dim_768
                         else {
                             "source": feats.half().to(device)
-                            if device != "cpu"
+                            if device != torch.device("cpu")
                             else feats.to(device),
                             "padding_mask": padding_mask.to(device),
                             # no pass "output_layer"
                         }
                     )
+
+                    # なんかまだこの時点でfloat16なので改めて変換
+                    if device == torch.device("cpu"):
+                        model = model.float()
+                        inputs["source"] = inputs["source"].float()
+
                     with torch.no_grad():
                         logits = model.extract_features(**inputs)
                         if is_feats_dim_768:
@@ -187,6 +204,10 @@ def run(
 
     if num_gpus < 1:
         device = shared.device
+    elif shared.device == torch.device("mps"): # Mac(MPS)でmultiprocessするとなんか落ちるのでCPUにする。
+        device = "cpu"
+
+
 
     for gpu_id in gpu_ids:
         if num_gpus < gpu_id + 1:
