@@ -13,8 +13,6 @@ from tqdm import tqdm
 from transformers import HubertModel as TrHubertModel
 from transformers import Wav2Vec2FeatureExtractor
 
-from modules import shared
-
 
 def load_embedder(embedder_path: str, device):
     try:
@@ -54,7 +52,6 @@ def load_transformers_hubert(repo_name: str, device):
 
 def load_transformers_hubert_local(embedder_path: str, device):
     try:
-        embedder_path = os.path.join(shared.ROOT_DIR, embedder_path)
         feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
             embedder_path, local_files_only=True
         )
@@ -98,9 +95,7 @@ def processor(
     out_dir: str,
     process_id: int,
 ):
-    # なんかパスが違っていた。ので、アドホックに直している。
-    embedder_path= embedder_path.replace("rvc-webui/models/hubert_base.pt","rvc-webui/models/embeddings/hubert_base.pt")
-    embedder_path= embedder_path.replace("rvc-webui/models/checkpoint_best_legacy_500.pt","rvc-webui/models/embeddings/checkpoint_best_legacy_500.pt")
+    half_support = device.type == "cuda" and torch.cuda.get_device_capability(device)[0] >= 5.3
 
     if embedder_load_from == "local" and not os.path.exists(embedder_path):
         return f"Embedder not found: {embedder_path}"
@@ -132,13 +127,13 @@ def processor(
                         return_tensors="pt",
                         sampling_rate=16000,
                     )
-                    if device != torch.device("cpu"):
+                    if half_support:
                         feats = feats.input_values.to(device).half()
                     else:
                         feats = feats.input_values.to(device).float()
- 
+
                     with torch.no_grad():
-                        if device != torch.device("cpu"):
+                        if half_support:
                             if is_feats_dim_768:
                                 feats = model[1](feats).last_hidden_state
                             else:
@@ -152,7 +147,7 @@ def processor(
                     inputs = (
                         {
                             "source": feats.half().to(device)
-                            if device != torch.device("cpu")
+                            if half_support
                             else feats.to(device),
                             "padding_mask": padding_mask.to(device),
                             "output_layer": 9,  # layer 9
@@ -160,7 +155,7 @@ def processor(
                         if not is_feats_dim_768
                         else {
                             "source": feats.half().to(device)
-                            if device != torch.device("cpu")
+                            if half_support
                             else feats.to(device),
                             "padding_mask": padding_mask.to(device),
                             # no pass "output_layer"
@@ -168,7 +163,7 @@ def processor(
                     )
 
                     # なんかまだこの時点でfloat16なので改めて変換
-                    if device == torch.device("cpu"):
+                    if not half_support:
                         model = model.float()
                         inputs["source"] = inputs["source"].float()
 
@@ -202,13 +197,6 @@ def run(
 
     num_gpus = len(gpu_ids)
 
-    if num_gpus < 1:
-        device = shared.device
-    elif shared.device == torch.device("mps"): # Mac(MPS)でmultiprocessするとなんか落ちるのでCPUにする。
-        device = "cpu"
-
-
-
     for gpu_id in gpu_ids:
         if num_gpus < gpu_id + 1:
             print(f"GPU {gpu_id} is not available")
@@ -229,6 +217,8 @@ def run(
     if device is not None:
         if type(device) == str:
             device = torch.device(device)
+        if device.type == "mps":
+            device = torch.device("cpu") # Mac(MPS) crashes when multiprocess, so change to CPU.
         processor(
             todo,
             device,

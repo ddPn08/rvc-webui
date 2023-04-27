@@ -7,7 +7,7 @@ import gradio as gr
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
 from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
-from modules.shared import MODELS_DIR, half_support
+from modules.shared import MODELS_DIR, half_support, device
 from modules.ui import Tab
 
 SR_DICT = {
@@ -73,7 +73,7 @@ class Training(Tab):
             )
 
             if embedder_load_from == "local":
-                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
+                embedder_filepath = os.path.join(MODELS_DIR, "embeddings", embedder_filepath)
 
             extract_feature.run(
                 training_dir,
@@ -191,6 +191,7 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
+                None if len(gpu_ids) > 0 else device
             )
 
             yield "Training index..."

@@ -59,7 +59,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     y = y.squeeze(1)
 
     # 現在、mpsはtorch.stftをサポートしていない。
-    if y.device == torch.device("mps:0"):
+    if y.device.type == "mps":
         spec = torch.stft(
             y.cpu(),
             n_fft,
@@ -71,7 +71,7 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
             normalized=False,
             onesided=True,
             return_complex=False,
-        ).to(device=torch.device("mps:0"))
+        ).to(device=y.device)
     else:
         spec = torch.stft(
             y,
@@ -133,20 +133,8 @@ def mel_spectrogram_torch(
     )
     y = y.squeeze(1)
 
-    # spec = torch.stft(
-    #     y,
-    #     n_fft,
-    #     hop_length=hop_size,
-    #     win_length=win_size,
-    #     window=hann_window[wnsize_dtype_device],
-    #     center=center,
-    #     pad_mode="reflect",
-    #     normalized=False,
-    #     onesided=True,
-    # )
-
     # 現在、mpsはtorch.stftをサポートしていない。
-    if y.device == torch.device("mps:0"):
+    if y.device.type == "mps":
         spec = torch.stft(
             y.cpu(),
             n_fft,
@@ -158,7 +146,7 @@ def mel_spectrogram_torch(
             normalized=False,
             onesided=True,
             return_complex=False,
-        ).to(device=torch.device("mps:0"))
+        ).to(device=y.device)
     else:
         spec = torch.stft(
             y,
