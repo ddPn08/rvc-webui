@@ -230,13 +230,14 @@ class Training(Tab):
                         )
                         embedder_name = gr.Radio(
                             choices=[
-                                "hubert_base",
+                                # "hubert_base",
                                 "contentvec",
-                                "distilhubert",
+                                "hubert-base-japanese",
+                                # "distilhubert",
                                 # "distilhubert-ja",    # temporary
                                 # "distilhubert-ja_dev",
                             ],
-                            value="hubert_base",
+                            value="contentvec",
                             label="Using phone embedder",
                         )
                         embedding_channels = gr.Radio(
