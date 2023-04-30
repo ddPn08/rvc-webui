@@ -7,7 +7,7 @@ import gradio as gr
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
 from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
-from modules.shared import MODELS_DIR, half_support, device
+from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
 
 SR_DICT = {
@@ -43,7 +43,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
-            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
             yield f"Training directory: {training_dir}"
 
             if os.path.exists(training_dir) and ignore_cache:
@@ -73,7 +73,9 @@ class Training(Tab):
             )
 
             if embedder_load_from == "local":
-                embedder_filepath = os.path.join(MODELS_DIR, "embeddings", embedder_filepath)
+                embedder_filepath = os.path.join(
+                    MODELS_DIR, "embeddings", embedder_filepath
+                )
 
             extract_feature.run(
                 training_dir,
@@ -122,7 +124,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
-            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
 
             if os.path.exists(training_dir) and ignore_cache:
                 shutil.rmtree(training_dir)
@@ -163,6 +165,7 @@ class Training(Tab):
                 embedder_load_from,
                 embedding_channels == 768,
                 gpu_ids,
+                None if len(gpu_ids) > 1 else device,
             )
 
             create_dataset_meta(training_dir, sampling_rate_str, f0)
@@ -191,7 +194,8 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
-                None if len(gpu_ids) > 0 else device
+                False,
+                None if len(gpu_ids) > 1 else device,
             )
 
             yield "Training index..."

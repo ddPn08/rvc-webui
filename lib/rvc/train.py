@@ -279,8 +279,9 @@ def training_runner(
     training_meta = DatasetMetadata.parse_file(training_files_path)
     embedder_out_channels = config.model.emb_channels
 
-    if device is not None and type(device) == str:
-        device = torch.device(device)
+    if device is not None:
+        if type(device) == str:
+            device = torch.device(device)
     else:
         device = torch.device(f"cuda:{rank}")
 
@@ -591,9 +592,7 @@ def training_runner(
                         config.data.mel_fmin,
                         config.data.mel_fmax,
                     )
-                if config.train.fp16_run == True and device != torch.device(
-                    "mps"
-                ):
+                if config.train.fp16_run == True and device != torch.device("mps"):
                     y_hat_mel = y_hat_mel.half()
                 wave = commons.slice_segments(
                     wave, ids_slice * config.data.hop_length, config.train.segment_size
