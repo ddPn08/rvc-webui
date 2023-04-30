@@ -7,7 +7,7 @@ import gradio as gr
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
 from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
-from modules.shared import MODELS_DIR
+from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
 
 SR_DICT = {
@@ -43,7 +43,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
-            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
             yield f"Training directory: {training_dir}"
 
             if os.path.exists(training_dir) and ignore_cache:
@@ -73,7 +73,9 @@ class Training(Tab):
             )
 
             if embedder_load_from == "local":
-                embedder_filepath = os.path.join(MODELS_DIR, embedder_filepath)
+                embedder_filepath = os.path.join(
+                    MODELS_DIR, "embeddings", embedder_filepath
+                )
 
             extract_feature.run(
                 training_dir,
@@ -109,12 +111,12 @@ class Training(Tab):
             cache_batch,
             num_epochs,
             save_every_epoch,
+            fp16,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
             embedder_name,
             embedding_channels,
             ignore_cache,
-            vc_client_compatible,
         ):
             batch_size = int(batch_size)
             num_epochs = int(num_epochs)
@@ -122,11 +124,7 @@ class Training(Tab):
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
-            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")]
-
-            if embedding_channels == 768 and vc_client_compatible:
-                yield "Error: 768 dim embedder is not compatible with VC client"
-                return
+            gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
 
             if os.path.exists(training_dir) and ignore_cache:
                 shutil.rmtree(training_dir)
@@ -167,6 +165,7 @@ class Training(Tab):
                 embedder_load_from,
                 embedding_channels == 768,
                 gpu_ids,
+                None if len(gpu_ids) > 1 else device,
             )
 
             create_dataset_meta(training_dir, sampling_rate_str, f0)
@@ -176,7 +175,7 @@ class Training(Tab):
             print(f"train_all: emb_name: {embedder_name}")
 
             config = utils.load_config(
-                training_dir, sampling_rate_str, embedding_channels
+                training_dir, sampling_rate_str, embedding_channels, fp16
             )
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
@@ -195,7 +194,8 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
-                vc_client_compatible=vc_client_compatible,
+                False,
+                None if len(gpu_ids) > 1 else device,
             )
 
             yield "Training index..."
@@ -244,9 +244,6 @@ class Training(Tab):
                             value="256",
                             label="Embedding channels",
                         )
-                        vc_client_compatible = gr.Checkbox(
-                            label="VC Client compatible", value=True
-                        )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
                             label="GPU ID",
@@ -283,6 +280,9 @@ class Training(Tab):
                             label="Save every epoch",
                         )
                         cache_batch = gr.Checkbox(label="Cache batch", value=True)
+                        fp16 = gr.Checkbox(
+                            label="FP16", value=half_support, disabled=not half_support
+                        )
                     with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
@@ -364,12 +364,12 @@ class Training(Tab):
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
+                fp16,
                 pre_trained_generator,
                 pre_trained_discriminator,
                 embedder_name,
                 embedding_channels,
                 ignore_cache,
-                vc_client_compatible,
             ],
             outputs=[status],
         )

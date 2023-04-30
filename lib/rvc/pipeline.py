@@ -9,7 +9,6 @@ import pyworld
 import scipy.signal as signal
 import torch
 import torch.nn.functional as F
-
 # from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
 from fairseq.models.hubert import HubertModel
 from transformers import HubertModel as TrHubertModel
@@ -20,10 +19,28 @@ from .models import SynthesizerTrnMs256NSFSid
 
 class VocalConvertPipeline(object):
     def __init__(self, tgt_sr: int, device: Union[str, torch.device], is_half: bool):
-        self.x_pad = 3 if is_half else 1
-        self.x_query = 10 if is_half else 6
-        self.x_center = 60 if is_half else 30
-        self.x_max = 65 if is_half else 32
+        if isinstance(device, str):
+            device = torch.device(device)
+        if device.type == "cuda":
+            vram = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        else:
+            vram = None
+
+        if vram is not None and vram <= 4:
+            self.x_pad = 1
+            self.x_query = 5
+            self.x_center = 30
+            self.x_max = 32
+        elif vram is not None and vram <= 5:
+            self.x_pad = 1
+            self.x_query = 6
+            self.x_center = 38
+            self.x_max = 41
+        else:
+            self.x_pad = 3
+            self.x_query = 10
+            self.x_center = 60
+            self.x_max = 65
 
         self.sr = 16000  # hubert input sample rate
         self.window = 160  # hubert input window
@@ -31,7 +48,7 @@ class VocalConvertPipeline(object):
         self.t_pad_tgt = tgt_sr * self.x_pad
         self.t_pad2 = self.t_pad * 2
         self.t_query = self.sr * self.x_query  # query time before and after query point
-        self.t_center = self.sr * self.x_query  # query cut point position
+        self.t_center = self.sr * self.x_center  # query cut point position
         self.t_max = self.sr * self.x_max  # max time for no query
         self.device = device
         self.is_half = is_half

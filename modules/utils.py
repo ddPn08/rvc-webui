@@ -57,15 +57,20 @@ def download_file(url: str, out: str, position: int = 0, show: bool = True):
                 f.write(chunk)
 
 
-def load_config(training_dir: str, sample_rate: str, emb_channels: int):
+def load_config(training_dir: str, sample_rate: str, emb_channels: int, fp16: bool):
     if emb_channels == 256:
         config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
     else:
         config_path = os.path.join(
             ROOT_DIR, "configs", f"{sample_rate}-{emb_channels}.json"
         )
+
+    config = TrainConfig.parse_file(config_path)
+    config.train.fp16_run = fp16
+
     config_save_path = os.path.join(training_dir, "config.json")
 
-    shutil.copyfile(config_path, config_save_path)
+    with open(config_save_path, "w") as f:
+        f.write(config.json())
 
-    return TrainConfig.parse_file(config_save_path)
+    return config

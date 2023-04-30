@@ -23,25 +23,22 @@ def has_mps():
 
 
 is_half = opts.precision == "fp16"
+half_support = (
+    torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 5.3
+)
+
+if not half_support:
+    print("WARNING: FP16 is not supported on this GPU")
+    is_half = False
 
 device = "cuda:0"
 
 if not torch.cuda.is_available():
-    if is_half:
-        print("WARNING: FP16 is not supported on CPU")
-    is_half = False
     if has_mps():
         print("Using MPS")
         device = "mps"
     else:
         print("Using CPU")
         device = "cpu"
-
-if device not in ["cpu", "mps"]:
-    gpu_name = torch.cuda.get_device_name(int(device.split(":")[-1]))
-    if "16" in gpu_name or "MX" in gpu_name:
-        if is_half:
-            print("WARNING: FP16 is not supported on this GPU")
-        is_half = False
 
 device = torch.device(device)

@@ -179,7 +179,7 @@ def train_model(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
-    vc_client_compatible: bool = False,
+    device: Optional[Union[str, torch.device]] = None,
 ):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = str(utils.find_empty_port())
@@ -195,11 +195,11 @@ def train_model(
 
     start = time.perf_counter()
 
-    mp.spawn(
-        training_runner,
-        nprocs=len(gpus),
-        args=(
-            len(gpus),
+    # Mac(MPS)でやると、mp.spawnでなんかトラブルが出るので普通にtraining_runnerを呼び出す。
+    if device.type == "mps":
+        training_runner(
+            0,  # rank
+            1,  # world size
             config,
             training_dir,
             model_name,
@@ -214,9 +214,31 @@ def train_model(
             pretrain_d,
             embedder_name,
             save_only_last,
-            vc_client_compatible,
-        ),
-    )
+            device,
+        )
+    else:
+        mp.spawn(
+            training_runner,
+            nprocs=len(gpus),
+            args=(
+                len(gpus),
+                config,
+                training_dir,
+                model_name,
+                out_dir,
+                sample_rate,
+                f0,
+                batch_size,
+                cache_batch,
+                total_epoch,
+                save_every_epoch,
+                pretrain_g,
+                pretrain_d,
+                embedder_name,
+                save_only_last,
+                device,
+            ),
+        )
 
     end = time.perf_counter()
 
@@ -248,7 +270,7 @@ def training_runner(
     pretrain_d: str,
     embedder_name: str,
     save_only_last: bool = False,
-    vc_client_compatible: bool = False,
+    device: Optional[Union[str, torch.device]] = None,
 ):
     config.train.batch_size = batch_size
     log_dir = os.path.join(training_dir, "logs")
@@ -256,6 +278,12 @@ def training_runner(
     training_files_path = os.path.join(training_dir, "meta.json")
     training_meta = DatasetMetadata.parse_file(training_files_path)
     embedder_out_channels = config.model.emb_channels
+
+    if device is not None:
+        if type(device) == str:
+            device = torch.device(device)
+    else:
+        device = torch.device(f"cuda:{rank}")
 
     global_step = 0
     is_main_process = rank == 0
@@ -322,10 +350,14 @@ def training_runner(
 
     if torch.cuda.is_available():
         net_g = net_g.cuda(rank)
+    elif device.type == "mps":
+        net_g = net_g.to(device=device)
 
     net_d = MultiPeriodDiscriminator(config.model.use_spectral_norm)
     if torch.cuda.is_available():
         net_d = net_d.cuda(rank)
+    elif device.type == "mps":
+        net_d = net_d.to(device=device)
 
     optim_g = torch.optim.AdamW(
         net_g.parameters(),
@@ -343,7 +375,7 @@ def training_runner(
     if torch.cuda.is_available():
         net_g = DDP(net_g, device_ids=[rank])
         net_d = DDP(net_d, device_ids=[rank])
-    else:
+    elif device.type != "mps":
         net_g = DDP(net_g)
         net_d = DDP(net_d)
 
@@ -391,11 +423,21 @@ def training_runner(
                     "to",
                     emb_phone_size,
                 )
-            net_g.module.load_state_dict(net_g_state)
+            if device.type == "mps":
+                # DDP通してないからか（？）moduleがないって言われる。下のnet_dも同様。
+                net_g.load_state_dict(net_g_state)
+            else:
+                net_g.module.load_state_dict(net_g_state)
             del net_g_state
-            net_d.module.load_state_dict(
-                torch.load(pretrain_d, map_location="cpu")["model"]
-            )
+
+            if device.type == "mps":
+                net_d.load_state_dict(
+                    torch.load(pretrain_d, map_location="cpu")["model"]
+                )
+            else:
+                net_d.module.load_state_dict(
+                    torch.load(pretrain_d, map_location="cpu")["model"]
+                )
             if is_main_process:
                 print(f"loaded pretrained {pretrain_g} {pretrain_d}")
 
@@ -461,21 +503,20 @@ def training_runner(
                 ) = batch
 
             if not use_cache:
-                if torch.cuda.is_available():
-                    phone, phone_lengths = phone.cuda(
-                        rank, non_blocking=True
-                    ), phone_lengths.cuda(rank, non_blocking=True)
-                    if f0 == 1:
-                        pitch, pitchf = pitch.cuda(
-                            rank, non_blocking=True
-                        ), pitchf.cuda(rank, non_blocking=True)
-                    sid = sid.cuda(rank, non_blocking=True)
-                    spec, spec_lengths = spec.cuda(
-                        rank, non_blocking=True
-                    ), spec_lengths.cuda(rank, non_blocking=True)
-                    wave, wave_lengths = wave.cuda(
-                        rank, non_blocking=True
-                    ), wave_lengths.cuda(rank, non_blocking=True)
+                phone, phone_lengths = phone.to(
+                    device=device, non_blocking=True
+                ), phone_lengths.to(device=device, non_blocking=True)
+                if f0 == 1:
+                    pitch, pitchf = pitch.to(
+                        device=device, non_blocking=True
+                    ), pitchf.to(device=device, non_blocking=True)
+                sid = sid.to(device=device, non_blocking=True)
+                spec, spec_lengths = spec.to(
+                    device=device, non_blocking=True
+                ), spec_lengths.to(device=device, non_blocking=True)
+                wave, wave_lengths = wave.to(
+                    device=device, non_blocking=True
+                ), wave_lengths.to(device=device, non_blocking=True)
                 if cache_in_gpu:
                     if f0 == 1:
                         cache.append(
@@ -551,7 +592,7 @@ def training_runner(
                         config.data.mel_fmin,
                         config.data.mel_fmax,
                     )
-                if config.train.fp16_run == True:
+                if config.train.fp16_run == True and device != torch.device("mps"):
                     y_hat_mel = y_hat_mel.half()
                 wave = commons.slice_segments(
                     wave, ids_slice * config.data.hop_length, config.train.segment_size
@@ -686,7 +727,6 @@ def training_runner(
                 embedder_out_channels,
                 os.path.join(training_dir, "checkpoints", f"{model_name}-{epoch}.pth"),
                 epoch,
-                vc_client_compatible=vc_client_compatible,
             )
 
         scheduler_g.step()
@@ -702,5 +742,4 @@ def training_runner(
             embedder_out_channels,
             os.path.join(out_dir, f"{model_name}.pth"),
             epoch,
-            vc_client_compatible=vc_client_compatible,
         )

@@ -58,18 +58,33 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     )
     y = y.squeeze(1)
 
-    spec = torch.stft(
-        y,
-        n_fft,
-        hop_length=hop_size,
-        win_length=win_size,
-        window=hann_window[wnsize_dtype_device],
-        center=center,
-        pad_mode="reflect",
-        normalized=False,
-        onesided=True,
-        return_complex=False,
-    )
+    # 現在、mpsはtorch.stftをサポートしていない。
+    if y.device.type == "mps":
+        spec = torch.stft(
+            y.cpu(),
+            n_fft,
+            hop_length=hop_size,
+            win_length=win_size,
+            window=hann_window[wnsize_dtype_device].cpu(),
+            center=center,
+            pad_mode="reflect",
+            normalized=False,
+            onesided=True,
+            return_complex=False,
+        ).to(device=y.device)
+    else:
+        spec = torch.stft(
+            y,
+            n_fft,
+            hop_length=hop_size,
+            win_length=win_size,
+            window=hann_window[wnsize_dtype_device],
+            center=center,
+            pad_mode="reflect",
+            normalized=False,
+            onesided=True,
+            return_complex=False,
+        )
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -118,29 +133,34 @@ def mel_spectrogram_torch(
     )
     y = y.squeeze(1)
 
-    # spec = torch.stft(
-    #     y,
-    #     n_fft,
-    #     hop_length=hop_size,
-    #     win_length=win_size,
-    #     window=hann_window[wnsize_dtype_device],
-    #     center=center,
-    #     pad_mode="reflect",
-    #     normalized=False,
-    #     onesided=True,
-    # )
-    spec = torch.stft(
-        y,
-        n_fft,
-        hop_length=hop_size,
-        win_length=win_size,
-        window=hann_window[wnsize_dtype_device],
-        center=center,
-        pad_mode="reflect",
-        normalized=False,
-        onesided=True,
-        return_complex=False,
-    )
+    # 現在、mpsはtorch.stftをサポートしていない。
+    if y.device.type == "mps":
+        spec = torch.stft(
+            y.cpu(),
+            n_fft,
+            hop_length=hop_size,
+            win_length=win_size,
+            window=hann_window[wnsize_dtype_device].cpu(),
+            center=center,
+            pad_mode="reflect",
+            normalized=False,
+            onesided=True,
+            return_complex=False,
+        ).to(device=y.device)
+    else:
+        spec = torch.stft(
+            y,
+            n_fft,
+            hop_length=hop_size,
+            win_length=win_size,
+            window=hann_window[wnsize_dtype_device],
+            center=center,
+            pad_mode="reflect",
+            normalized=False,
+            onesided=True,
+            return_complex=False,
+        )
+
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
 
     spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
