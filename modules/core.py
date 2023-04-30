@@ -31,6 +31,13 @@ def calc_sha256(filepath: str):
 
 
 def download_models():
+    def hash_check(url: str, out: str):
+        if not os.path.exists(out):
+            return False
+        etag = get_hf_etag(url)
+        hash = calc_sha256(out)
+        return etag == hash
+
     tasks = []
     for template in [
         "D{}k{}",
@@ -44,11 +51,8 @@ def download_models():
                 url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/{basename}.pth"
                 out = os.path.join(MODELS_DIR, "pretrained", f"{basename}.pth")
 
-                if os.path.exists(out):
-                    etag = get_hf_etag(url)
-                    hash = calc_sha256(out)
-                    if etag == hash:
-                        continue
+                if hash_check(url, out):
+                    continue
 
                 tasks.append((url, out))
 
@@ -59,15 +63,25 @@ def download_models():
         out = os.path.join(MODELS_DIR, "embeddings", filename)
         url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}"
 
-        if os.path.exists(out):
-            etag = get_hf_etag(url)
-            hash = calc_sha256(out)
-            if etag == hash:
-                continue
+        if hash_check(url, out):
+            continue
 
         tasks.append(
             (
                 f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}",
+                out,
+            )
+        )
+
+    # japanese-hubert-base (Fairseq)
+    # from official repo
+    # NOTE: change filename?
+    hubert_jp_url = f"https://huggingface.co/rinna/japanese-hubert-base/resolve/main/fairseq/model.pt"
+    out = os.path.join(MODELS_DIR, "embeddings", "rinna_hubert_base_jp.pt")
+    if not hash_check(hubert_jp_url, out):
+        tasks.append(
+            (
+                hubert_jp_url,
                 out,
             )
         )

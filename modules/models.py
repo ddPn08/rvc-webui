@@ -19,10 +19,11 @@ from .utils import load_audio
 AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
-EMBEDDERS_LIST = {
-    "hubert_base": ("hubert_base.pt", "hubert_base", "local"),
+EMBEDDINGS_LIST = {
+    # "hubert_base": ("hubert_base.pt", "hubert_base", "local"),
+    "hubert-base-japanese": ("rinna_hubert_base_jp.pt", "hubert-base-japanese", "local"),
     "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec", "local"),
-    "distilhubert": ("ntu-spml/distilhubert", "distilhubert", "hf"),
+    # "distilhubert": ("ntu-spml/distilhubert", "distilhubert", "hf"),
     # "distilhubert-ja": ("TylorShine/distilhubert-ft-japanese-50k", "distilhubert-ja", "hf"),
     # "distilhubert-ja_dev": ("models/pretrained/feature_extractors/distilhubert-ja-en", "distilhubert-ja_dev", "tr-local"),
 }
@@ -123,11 +124,11 @@ class VoiceConvertModel:
             )
             if embedder_model_name.endswith("768"):
                 embedder_model_name = embedder_model_name[:-3]
-        if not embedder_model_name in EMBEDDERS_LIST.keys():
+        if not embedder_model_name in EMBEDDINGS_LIST.keys():
             raise Exception(f"Not supported embedder: {embedder_model_name}")
         if (
             embedder_model == None
-            or loaded_embedder_model != EMBEDDERS_LIST[embedder_model_name][1]
+            or loaded_embedder_model != EMBEDDINGS_LIST[embedder_model_name][1]
         ):
             print(f"load {embedder_model_name} embedder")
             embedder_filename, embedder_name, load_from = get_embedder(
@@ -228,8 +229,8 @@ def get_models():
 
 
 def get_embedder(embedder_name):
-    if embedder_name in EMBEDDERS_LIST:
-        return EMBEDDERS_LIST[embedder_name]
+    if embedder_name in EMBEDDINGS_LIST:
+        return EMBEDDINGS_LIST[embedder_name]
     return None
 
 
