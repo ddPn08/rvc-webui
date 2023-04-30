@@ -1,5 +1,4 @@
 import os
-import shutil
 
 import ffmpeg
 import numpy as np
@@ -33,6 +32,7 @@ def load_audio(file: str, sr):
 def get_gpus():
     num_gpus = torch.cuda.device_count()
     return [torch.device(f"cuda:{i}") for i in range(num_gpus)]
+
 
 
 def download_file(url: str, out: str, position: int = 0, show: bool = True):

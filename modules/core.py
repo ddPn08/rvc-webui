@@ -1,13 +1,33 @@
+import hashlib
 import os
 import shutil
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
-from tqdm import tqdm
+import requests
 
 from modules.models import MODELS_DIR
 from modules.shared import ROOT_DIR
 from modules.utils import download_file
+
+
+def get_hf_etag(url: str):
+    r = requests.head(url)
+
+    etag = r.headers["X-Linked-ETag"] if "X-Linked-ETag" in r.headers else ""
+
+    if etag.startswith('"') and etag.endswith('"'):
+        etag = etag[1:-1]
+
+    return etag
+
+
+def calc_sha256(filepath: str):
+    sha256 = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
 
 
 def download_models():
@@ -21,25 +41,36 @@ def download_models():
         for sr in ["32", "40", "48"]:
             for emb_channels in ["256", "768"]:
                 basename = template.format(sr, emb_channels)
-                filename = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/{basename}.pth"
+                url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/{basename}.pth"
                 out = os.path.join(MODELS_DIR, "pretrained", f"{basename}.pth")
+
                 if os.path.exists(out):
-                    # TODO: Hash check
-                    continue
-                tasks.append((filename, out))
+                    etag = get_hf_etag(url)
+                    hash = calc_sha256(out)
+                    if etag == hash:
+                        continue
+
+                tasks.append((url, out))
 
     for filename in [
         "hubert_base.pt",
         "checkpoint_best_legacy_500.pt",
     ]:
         out = os.path.join(MODELS_DIR, "embeddings", filename)
-        if not os.path.exists(out):
-            tasks.append(
-                (
-                    f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}",
-                    out,
-                )
+        url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}"
+
+        if os.path.exists(out):
+            etag = get_hf_etag(url)
+            hash = calc_sha256(out)
+            if etag == hash:
+                continue
+
+        tasks.append(
+            (
+                f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/embeddings/{filename}",
+                out,
             )
+        )
 
     # japanese-hubert-base (Fairseq)
     # from official repo
@@ -56,13 +87,13 @@ def download_models():
     if len(tasks) < 1:
         return
 
-    with ProcessPoolExecutor() as pool:
-        with tqdm(total=len(tasks)) as progress:
-            for _ in pool.map(
-                download_file,
-                *zip(*[(filename, out, 0, False) for filename, out in tasks]),
-            ):
-                progress.update()
+    with ThreadPoolExecutor() as pool:
+        pool.map(
+            download_file,
+            *zip(
+                *[(filename, out, i, True) for i, (filename, out) in enumerate(tasks)]
+            ),
+        )
 
 
 def install_ffmpeg():
