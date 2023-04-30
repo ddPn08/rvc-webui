@@ -20,10 +20,10 @@ AUDIO_OUT_DIR = opts.output_dir or os.path.join(ROOT_DIR, "outputs")
 
 
 EMBEDDERS_LIST = {
-    "hubert_base": ("hubert_base.pt", "hubert_base", "local"),
-    "hubert-base-japanese": ("model.pt", "hubert-base-japanese", "local"),
+    # "hubert_base": ("hubert_base.pt", "hubert_base", "local"),
+    "hubert-base-japanese": ("rinna_hubert_base_jp.pt", "hubert-base-japanese", "local"),
     "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec", "local"),
-    "distilhubert": ("ntu-spml/distilhubert", "distilhubert", "hf"),
+    # "distilhubert": ("ntu-spml/distilhubert", "distilhubert", "hf"),
     # "distilhubert-ja": ("TylorShine/distilhubert-ft-japanese-50k", "distilhubert-ja", "hf"),
     # "distilhubert-ja_dev": ("models/pretrained/feature_extractors/distilhubert-ja-en", "distilhubert-ja_dev", "tr-local"),
 }
