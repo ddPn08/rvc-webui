@@ -29,9 +29,10 @@ def inference_options_ui(show_out_dir=True):
             embedder_model = gr.Radio(
                 choices=[
                     "auto",
-                    "hubert_base",
+                    # "hubert_base",
                     "contentvec",
-                    "distilhubert",
+                    "hubert-base-japanese",
+                    # "distilhubert",
                     # "distilhubert-ja",
                     # "distilhubert-ja_dev",
                 ],

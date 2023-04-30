@@ -41,6 +41,18 @@ def download_models():
                 )
             )
 
+    # japanese-hubert-base (Fairseq)
+    # from official repo
+    # NOTE: change filename?
+    out = os.path.join(MODELS_DIR, "embeddings", "model.pt")
+    if not os.path.exists(out):
+        tasks.append(
+            (
+                f"https://huggingface.co/rinna/japanese-hubert-base/resolve/main/fairseq/model.pt",
+                out,
+            )
+        )
+
     if len(tasks) < 1:
         return
 
