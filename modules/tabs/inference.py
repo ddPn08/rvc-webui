@@ -26,15 +26,10 @@ def inference_options_ui(show_out_dir=True):
                 value="pm",
                 label="Pitch Extraction Algorithm",
             )
-            embedder_model = gr.Radio(
+            embedding_model = gr.Radio(
                 choices=[
                     "auto",
-                    # "hubert_base",
-                    "contentvec",
-                    "hubert-base-japanese",
-                    # "distilhubert",
-                    # "distilhubert-ja",
-                    # "distilhubert-ja_dev",
+                    *models.EMBEDDINGS_LIST.keys()
                 ],
                 value="auto",
                 label="Embedder Model",
@@ -57,7 +52,7 @@ def inference_options_ui(show_out_dir=True):
         source_audio,
         out_dir,
         transpose,
-        embedder_model,
+        embedding_model,
         pitch_extraction_algo,
         auto_load_index,
         faiss_index_file,
