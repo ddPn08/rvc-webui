@@ -9,7 +9,8 @@ from pydub import AudioSegment
 from transformers import HubertModel as TrHubertModel
 from transformers import Wav2Vec2FeatureExtractor
 
-from lib.rvc.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
+from lib.rvc.models import (SynthesizerTrnMs256NSFSid,
+                            SynthesizerTrnMs256NSFSidNono)
 from lib.rvc.pipeline import VocalConvertPipeline
 
 from .cmd_opts import opts
@@ -124,6 +125,8 @@ class VoiceConvertModel:
             )
             if embedder_model_name.endswith("768"):
                 embedder_model_name = embedder_model_name[:-3]
+        if embedder_model_name == "hubert_base":
+            embedder_model_name = "contentvec"
         if not embedder_model_name in EMBEDDINGS_LIST.keys():
             raise Exception(f"Not supported embedder: {embedder_model_name}")
         if (
