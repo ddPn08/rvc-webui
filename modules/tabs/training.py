@@ -196,7 +196,7 @@ class Training(Tab):
                 pre_trained_bottom_model_d,
                 embedder_name,
                 False,
-                None if len(gpu_ids) > 1 else device,
+                None if len(gpu_ids) > 0 else device,
             )
 
             yield "Training index..."
