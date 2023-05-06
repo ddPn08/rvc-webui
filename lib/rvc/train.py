@@ -196,7 +196,7 @@ def train_model(
     start = time.perf_counter()
 
     # Mac(MPS)でやると、mp.spawnでなんかトラブルが出るので普通にtraining_runnerを呼び出す。
-    if device.type == "mps":
+    if device is not None and device.type == "mps":
         training_runner(
             0,  # rank
             1,  # world size
