@@ -146,11 +146,18 @@ def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int):
             phone = np.load(os.path.join(feature_256_spk_dir, name))
             npys.append(phone)
 
+        # shuffle big_npy to prevent reproducing the sound source
         big_npy = np.concatenate(npys, 0)
-        n_ivf = big_npy.shape[0] // 39
-        index = faiss.index_factory(emb_ch, f"IVF{n_ivf},Flat")
-        index_ivf = faiss.extract_index_ivf(index)
-        index_ivf.nprobe = int(np.power(n_ivf, 0.3))
+        big_npy_idx = np.arange(big_npy.shape[0])
+        np.random.shuffle(big_npy_idx)
+        big_npy = big_npy[big_npy_idx]
+
+        # recommend parameter in https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
+        emb_ch = big_npy.shape[1]
+        emb_ch_half = emb_ch // 2
+        n_ivf = int(8 * np.sqrt(big_npy.shape[0]))
+        index = faiss.index_factory(emb_ch, f"IVF{n_ivf},PQ{emb_ch_half}x4fsr,RFlat")
+
         index.train(big_npy)
         index.add(big_npy)
         np.save(
