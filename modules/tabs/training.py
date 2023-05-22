@@ -241,7 +241,9 @@ class Training(Tab):
             with gr.Box():
                 with gr.Column():
                     with gr.Row().style():
-                        model_name = gr.Textbox(label="Model Name")
+                        with gr.Column():
+                            model_name = gr.Textbox(label="Model Name")
+                            ignore_cache = gr.Checkbox(label="Ignore cache")
                         with gr.Column():
                             dataset_glob = gr.Textbox(
                                 label="Dataset glob", placeholder="data/**/*.wav"
@@ -257,7 +259,6 @@ class Training(Tab):
                                 step=1,
                                 label="Speaker ID",
                             )
-                        ignore_cache = gr.Checkbox(label="Ignore cache")
 
                     with gr.Row().style(equal_height=False):
                         version = gr.Radio(

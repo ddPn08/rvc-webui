@@ -4,9 +4,9 @@ from modules.separate import separate_audio
 from modules.ui import Tab
 
 
-class Separate(Tab):
+class Split(Tab):
     def title(self):
-        return "Separate Audio"
+        return "Split Audio"
 
     def sort(self):
         return 5
