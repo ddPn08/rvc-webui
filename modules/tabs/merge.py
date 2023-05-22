@@ -72,12 +72,12 @@ class Merge(Tab):
             speaker_id,
             source_audio,
             embedder_name,
+            embedding_output_layer,
             transpose,
             fo_curve_file,
             pitch_extraction_algo,
             auto_load_index,
             faiss_index_file,
-            big_npy_file,
             retrieval_feature_ratio,
         ):
             merged = merge_ckpt(
@@ -88,12 +88,12 @@ class Merge(Tab):
                 speaker_id,
                 source_audio,
                 embedder_name,
+                embedding_output_layer,
                 transpose,
                 fo_curve_file,
                 pitch_extraction_algo,
                 auto_load_index,
                 faiss_index_file,
-                big_npy_file,
                 retrieval_feature_ratio,
             )
             tgt_sr = model.tgt_sr
@@ -279,10 +279,10 @@ class Merge(Tab):
                         _,
                         transpose,
                         embedder_name,
+                        embedding_output_layer,
                         pitch_extraction_algo,
                         auto_load_index,
                         faiss_index_file,
-                        big_npy_file,
                         retrieval_feature_ratio,
                         fo_curve_file,
                     ) = inference_options_ui(show_out_dir=False)
@@ -334,12 +334,12 @@ class Merge(Tab):
                     speaker_id,
                     source_audio,
                     embedder_name,
+                    embedding_output_layer,
                     transpose,
                     fo_curve_file,
                     pitch_extraction_algo,
                     auto_load_index,
                     faiss_index_file,
-                    big_npy_file,
                     retrieval_feature_ratio,
                 ]
 

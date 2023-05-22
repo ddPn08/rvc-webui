@@ -1,4 +1,5 @@
 import os
+from typing import *
 
 import ffmpeg
 import numpy as np
@@ -34,7 +35,6 @@ def get_gpus():
     return [torch.device(f"cuda:{i}") for i in range(num_gpus)]
 
 
-
 def download_file(url: str, out: str, position: int = 0, show: bool = True):
     req = requests.get(url, stream=True, allow_redirects=True)
     content_length = req.headers.get("content-length")
@@ -57,7 +57,13 @@ def download_file(url: str, out: str, position: int = 0, show: bool = True):
                 f.write(chunk)
 
 
-def load_config(training_dir: str, sample_rate: str, emb_channels: int, fp16: bool):
+def load_config(
+    version: Literal["v1", "v2"],
+    training_dir: str,
+    sample_rate: str,
+    emb_channels: int,
+    fp16: bool,
+):
     if emb_channels == 256:
         config_path = os.path.join(ROOT_DIR, "configs", f"{sample_rate}.json")
     else:
@@ -66,6 +72,7 @@ def load_config(training_dir: str, sample_rate: str, emb_channels: int, fp16: bo
         )
 
     config = TrainConfig.parse_file(config_path)
+    config.version = version
     config.train.fp16_run = fp16
 
     config_save_path = os.path.join(training_dir, "config.json")

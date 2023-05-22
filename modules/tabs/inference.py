@@ -27,17 +27,18 @@ def inference_options_ui(show_out_dir=True):
                 label="Pitch Extraction Algorithm",
             )
             embedding_model = gr.Radio(
-                choices=[
-                    "auto",
-                    *models.EMBEDDINGS_LIST.keys()
-                ],
+                choices=["auto", *models.EMBEDDINGS_LIST.keys()],
                 value="auto",
                 label="Embedder Model",
+            )
+            embedding_output_layer = gr.Radio(
+                choices=["auto", "9", "12"],
+                value="auto",
+                label="Embedder Output Layer",
             )
         with gr.Column():
             auto_load_index = gr.Checkbox(value=False, label="Auto Load Index")
             faiss_index_file = gr.Textbox(value="", label="Faiss Index File Path")
-            big_npy_file = gr.Textbox(value="", label="Big NPY File Path")
             retrieval_feature_ratio = gr.Slider(
                 minimum=0,
                 maximum=1,
@@ -53,10 +54,10 @@ def inference_options_ui(show_out_dir=True):
         out_dir,
         transpose,
         embedding_model,
+        embedding_output_layer,
         pitch_extraction_algo,
         auto_load_index,
         faiss_index_file,
-        big_npy_file,
         retrieval_feature_ratio,
         fo_curve_file,
     )
@@ -75,12 +76,12 @@ class Inference(Tab):
             input_audio,
             out_dir,
             embedder_model,
+            embedding_output_layer,
             f0_up_key,
             f0_file,
             f0_method,
             auto_load_index,
             faiss_index_file,
-            big_npy_file,
             index_rate,
         ):
             model = models.vc_model
@@ -108,12 +109,12 @@ class Inference(Tab):
                         sid,
                         file,
                         embedder_model,
+                        embedding_output_layer,
                         f0_up_key,
                         f0_file,
                         f0_method,
                         auto_load_index,
                         faiss_index_file,
-                        big_npy_file,
                         index_rate,
                         output_dir=out_dir,
                     )
@@ -131,10 +132,10 @@ class Inference(Tab):
                         out_dir,
                         transpose,
                         embedder_model,
+                        embedding_output_layer,
                         pitch_extraction_algo,
                         auto_load_index,
                         faiss_index_file,
-                        big_npy_file,
                         retrieval_feature_ratio,
                         f0_curve_file,
                     ) = inference_options_ui()
@@ -154,12 +155,12 @@ class Inference(Tab):
                 source_audio,
                 out_dir,
                 embedder_model,
+                embedding_output_layer,
                 transpose,
                 f0_curve_file,
                 pitch_extraction_algo,
                 auto_load_index,
                 faiss_index_file,
-                big_npy_file,
                 retrieval_feature_ratio,
             ],
             outputs=[status, output],

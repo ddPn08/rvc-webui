@@ -14,10 +14,12 @@ def write_config(state_dict: Dict[str, Any], cfg: Dict[str, Any]):
 
 def create_trained_model(
     weights: Dict[str, Any],
+    version: Literal["v1", "v2"],
     sr: str,
-    f0: int,
+    f0: bool,
     emb_name: str,
     emb_ch: int,
+    emb_output_layer: int,
     epoch: int,
 ):
     state_dict = OrderedDict()
@@ -101,19 +103,23 @@ def create_trained_model(
                 "sr": 32000,
             },
         )
+    state_dict["version"] = version
     state_dict["info"] = f"{epoch}epoch"
     state_dict["sr"] = sr
-    state_dict["f0"] = int(f0)
+    state_dict["f0"] = 1 if f0 else 0
     state_dict["embedder_name"] = emb_name
+    state_dict["embedder_output_layer"] = emb_output_layer
     return state_dict
 
 
 def save(
     model,
+    version: Literal["v1", "v2"],
     sr: str,
-    f0: int,
+    f0: bool,
     emb_name: str,
     emb_ch: int,
+    emb_output_layer: int,
     filepath: str,
     epoch: int,
 ):
@@ -126,10 +132,12 @@ def save(
 
     state_dict = create_trained_model(
         state_dict,
+        version,
         sr,
         f0,
         emb_name,
         emb_ch,
+        emb_output_layer,
         epoch,
     )
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

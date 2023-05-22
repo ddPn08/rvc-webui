@@ -9,16 +9,9 @@ import scipy.signal as signal
 from scipy.io import wavfile
 from tqdm import tqdm
 
-from modules.models import MODELS_DIR
-from modules.utils import load_audio
+from lib.rvc.utils import load_audio
 
 from .slicer import Slicer
-
-SR_K_DICT = {
-    32000: "32k",
-    40000: "40k",
-    48000: "48k",
-}
 
 
 def norm_write(
@@ -150,6 +143,7 @@ def preprocess_audio(
     num_processes: int,
     training_dir: str,
     is_normalize: bool,
+    mute_wav_path: str,
 ):
     waves_dir = os.path.join(training_dir, "0_gt_wavs")
     waves16k_dir = os.path.join(training_dir, "1_16k_wavs")
@@ -178,11 +172,11 @@ def preprocess_audio(
             data = all[all_index : all_index + process_all_nums[i]]
             slicer = Slicer(
                 sr=sampling_rate,
-                threshold=-40,
-                min_length=800,
+                threshold=-42,
+                min_length=1500,
                 min_interval=400,
                 hop_size=15,
-                max_sil_kept=150,
+                max_sil_kept=500,
             )
             executor.submit(
                 pipeline,
@@ -196,12 +190,5 @@ def preprocess_audio(
             )
             all_index += process_all_nums[i]
 
-    mute_wav = os.path.join(
-        MODELS_DIR,
-        "training",
-        "mute",
-        "0_gt_wavs",
-        f"mute{SR_K_DICT[sampling_rate]}.wav",
-    )
     for speaker_id in set([spk for _, spk in datasets]):
-        write_mute(mute_wav, speaker_id, waves_dir, waves16k_dir, sampling_rate)
+        write_mute(mute_wav_path, speaker_id, waves_dir, waves16k_dir, sampling_rate)

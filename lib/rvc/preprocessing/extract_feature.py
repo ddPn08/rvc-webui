@@ -90,12 +90,16 @@ def processor(
     device: torch.device,
     embedder_path: str,
     embedder_load_from: str,
-    is_feats_dim_768: bool,
+    embedding_channel: bool,
+    embedding_output_layer: int,
     wav_dir: str,
     out_dir: str,
     process_id: int,
 ):
-    half_support = device.type == "cuda" and torch.cuda.get_device_capability(device)[0] >= 5.3
+    half_support = (
+        device.type == "cuda" and torch.cuda.get_device_capability(device)[0] >= 5.3
+    )
+    is_feats_dim_768 = embedding_channel == 768
 
     if embedder_load_from == "local" and not os.path.exists(embedder_path):
         return f"Embedder not found: {embedder_path}"
@@ -144,23 +148,13 @@ def processor(
                             else:
                                 feats = model[1].float()(feats).extract_features
                 else:
-                    inputs = (
-                        {
-                            "source": feats.half().to(device)
-                            if half_support
-                            else feats.to(device),
-                            "padding_mask": padding_mask.to(device),
-                            "output_layer": 9,  # layer 9
-                        }
-                        if not is_feats_dim_768
-                        else {
-                            "source": feats.half().to(device)
-                            if half_support
-                            else feats.to(device),
-                            "padding_mask": padding_mask.to(device),
-                            # no pass "output_layer"
-                        }
-                    )
+                    inputs = {
+                        "source": feats.half().to(device)
+                        if half_support
+                        else feats.to(device),
+                        "padding_mask": padding_mask.to(device),
+                        "output_layer": embedding_output_layer,
+                    }
 
                     # なんかまだこの時点でfloat16なので改めて変換
                     if not half_support:
@@ -188,7 +182,8 @@ def run(
     training_dir: str,
     embedder_path: str,
     embedder_load_from: str,
-    is_feats_dim_768: bool,
+    embedding_channel: int,
+    embedding_output_layer: int,
     gpu_ids: List[int],
     device: Optional[Union[torch.device, str]] = None,
 ):
@@ -218,13 +213,16 @@ def run(
         if type(device) == str:
             device = torch.device(device)
         if device.type == "mps":
-            device = torch.device("cpu") # Mac(MPS) crashes when multiprocess, so change to CPU.
+            device = torch.device(
+                "cpu"
+            )  # Mac(MPS) crashes when multiprocess, so change to CPU.
         processor(
             todo,
             device,
             embedder_path,
             embedder_load_from,
-            is_feats_dim_768,
+            embedding_channel,
+            embedding_output_layer,
             wav_dir,
             out_dir,
             process_id=0,
@@ -238,7 +236,8 @@ def run(
                     torch.device(f"cuda:{id}"),
                     embedder_path,
                     embedder_load_from,
-                    is_feats_dim_768,
+                    embedding_channel,
+                    embedding_output_layer,
                     wav_dir,
                     out_dir,
                     process_id=i,
