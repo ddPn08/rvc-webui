@@ -2,7 +2,6 @@ import glob
 import json
 import operator
 import os
-import re
 import time
 from random import shuffle
 from typing import *
@@ -22,55 +21,60 @@ from torch.utils.tensorboard import SummaryWriter
 from . import commons, utils
 from .checkpoints import save
 from .config import DatasetMetadata, TrainConfig
-from .data_utils import (
-    DistributedBucketSampler,
-    TextAudioCollate,
-    TextAudioCollateMultiNSFsid,
-    TextAudioLoader,
-    TextAudioLoaderMultiNSFsid,
-)
+from .data_utils import (DistributedBucketSampler, TextAudioCollate,
+                         TextAudioCollateMultiNSFsid, TextAudioLoader,
+                         TextAudioLoaderMultiNSFsid)
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import (
-    MultiPeriodDiscriminator,
-    SynthesizerTrnMs256NSFSid,
-    SynthesizerTrnMs256NSFSidNono,
-)
+from .models import (MultiPeriodDiscriminator, SynthesizerTrnMs256NSFSid,
+                     SynthesizerTrnMs256NSFSidNono)
+
+audio_exts = [
+    ".wav",
+    ".flac",
+    ".ogg",
+    ".mp3",
+    ".m4a",
+    ".wma",
+    ".aiff",
+]
 
 
-def glob_dataset(glob_str: str, speaker_id: int):
+def glob_dataset(glob_str: str, speaker_id: int, multiple_speakers: bool = False, recursive: bool = True):
     globs = glob_str.split(",")
     datasets_speakers = []
     for glob_str in globs:
         if os.path.isdir(glob_str):
             files = os.listdir(glob_str)
-            # pattern: {glob_str}/{decimal}[_]* and isdir
-            multi_speakers_dir = [
-                (os.path.join(glob_str, f), int(f.split("_")[0]))
-                for f in files
-                if os.path.isdir(os.path.join(glob_str, f))
-                and f.split("_")[0].isdecimal()
-            ]
-
-            if len(multi_speakers_dir) > 0:
-                # multi speakers at once train
-                match_files_re = re.compile(r".+\.(wav|flac)")  # matches .wav and .flac
-                datasets_speakers = [
-                    (file, dir[1])
-                    for dir in multi_speakers_dir
-                    for file in glob.iglob(os.path.join(dir[0], "*"), recursive=True)
-                    if match_files_re.search(file)
+            if multiple_speakers:
+                # pattern: {glob_str}/{decimal}[_]* and isdir
+                multi_speakers_dir = [
+                    (os.path.join(glob_str, f), int(f.split("_")[0]))
+                    for f in files
+                    if os.path.isdir(os.path.join(glob_str, f))
+                    and f.split("_")[0].isdecimal()
                 ]
-                # for dir in dirs:
-                #     for file in glob.iglob(dir[0], recursive=True):
-                #         if match_files_re.search(file):
-                #             datasets_speakers.append((file, dirs[1]))
-                # return sorted(datasets_speakers, key=operator.itemgetter(0))
 
-            glob_str = os.path.join(glob_str, "*.wav")
+                if len(multi_speakers_dir) > 0:
+                    # multi speakers at once train
+                    datasets_speakers = [
+                        (file, dir[1])
+                        for dir in multi_speakers_dir
+                        for file in glob.iglob(
+                            os.path.join(dir[0], "*"), recursive=recursive
+                        )
+                        if os.path.splitext(file)[1] in audio_exts
+                    ]
+                    continue
+
+            glob_str = os.path.join(glob_str, "**", "*")
 
         datasets_speakers.extend(
-            [(file, speaker_id) for file in glob.iglob(glob_str, recursive=True)]
+            [
+                (file, speaker_id)
+                for file in glob.iglob(glob_str, recursive=recursive)
+                if os.path.splitext(file)[1] in audio_exts
+            ]
         )
 
     return sorted(datasets_speakers, key=operator.itemgetter(0))

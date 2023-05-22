@@ -31,6 +31,8 @@ class Training(Tab):
             target_sr,
             f0,
             dataset_glob,
+            recursive,
+            multiple_speakers,
             speaker_id,
             gpu_id,
             num_cpu_process,
@@ -52,7 +54,12 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
-            datasets = glob_dataset(dataset_glob, speaker_id)
+            datasets = glob_dataset(
+                dataset_glob,
+                speaker_id,
+                multiple_speakers=multiple_speakers,
+                recursive=recursive,
+            )
 
             yield "Preprocessing..."
             split.preprocess_audio(
@@ -112,6 +119,8 @@ class Training(Tab):
             sampling_rate_str,
             f0,
             dataset_glob,
+            recursive,
+            multiple_speakers,
             speaker_id,
             gpu_id,
             num_cpu_process,
@@ -143,7 +152,12 @@ class Training(Tab):
 
             yield f"Training directory: {training_dir}"
 
-            datasets = glob_dataset(dataset_glob, speaker_id)
+            datasets = glob_dataset(
+                dataset_glob,
+                speaker_id,
+                multiple_speakers=multiple_speakers,
+                recursive=recursive,
+            )
 
             yield "Preprocessing..."
             split.preprocess_audio(
@@ -226,15 +240,24 @@ class Training(Tab):
         with gr.Group():
             with gr.Box():
                 with gr.Column():
-                    with gr.Row().style(equal_height=False):
+                    with gr.Row().style():
                         model_name = gr.Textbox(label="Model Name")
+                        with gr.Column():
+                            dataset_glob = gr.Textbox(
+                                label="Dataset glob", placeholder="data/**/*.wav"
+                            )
+                            recursive = gr.Checkbox(label="Recursive", value=True)
+                            multiple_speakers = gr.Checkbox(
+                                label="Multiple speakers", value=False
+                            )
+                            speaker_id = gr.Slider(
+                                maximum=4,
+                                minimum=0,
+                                value=0,
+                                step=1,
+                                label="Speaker ID",
+                            )
                         ignore_cache = gr.Checkbox(label="Ignore cache")
-                        dataset_glob = gr.Textbox(
-                            label="Dataset glob", placeholder="data/**/*.wav"
-                        )
-                        speaker_id = gr.Slider(
-                            maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
-                        )
 
                     with gr.Row().style(equal_height=False):
                         version = gr.Radio(
@@ -310,11 +333,15 @@ class Training(Tab):
                     with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0G40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "v2", "f0G40k.pth"
+                            ),
                         )
                         pre_trained_discriminator = gr.Textbox(
                             label="Pre trained discriminator path",
-                            value=os.path.join(MODELS_DIR, "pretrained", "f0D40k.pth"),
+                            value=os.path.join(
+                                MODELS_DIR, "pretrained", "v2", "f0D40k.pth"
+                            ),
                         )
 
                     with gr.Row().style(equal_height=False):
@@ -330,6 +357,8 @@ class Training(Tab):
                 target_sr,
                 f0,
                 dataset_glob,
+                recursive,
+                multiple_speakers,
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
@@ -351,6 +380,8 @@ class Training(Tab):
                 target_sr,
                 f0,
                 dataset_glob,
+                recursive,
+                multiple_speakers,
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
