@@ -24,13 +24,11 @@ def dynamic_range_decompression_torch(x, C=1):
 
 
 def spectral_normalize_torch(magnitudes):
-    output = dynamic_range_compression_torch(magnitudes)
-    return output
+    return dynamic_range_compression_torch(magnitudes)
 
 
 def spectral_de_normalize_torch(magnitudes):
-    output = dynamic_range_decompression_torch(magnitudes)
-    return output
+    return dynamic_range_decompression_torch(magnitudes)
 
 
 mel_basis = {}
@@ -38,9 +36,9 @@ hann_window = {}
 
 
 def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False):
-    if torch.min(y) < -1.0:
+    if torch.min(y) < -1.07:
         print("min value is ", torch.min(y))
-    if torch.max(y) > 1.0:
+    if torch.max(y) > 1.07:
         print("max value is ", torch.max(y))
 
     global hann_window
@@ -58,33 +56,25 @@ def spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center=False)
     )
     y = y.squeeze(1)
 
-    # 現在、mpsはtorch.stftをサポートしていない。
+    # mps does not support torch.stft.
     if y.device.type == "mps":
-        spec = torch.stft(
-            y.cpu(),
-            n_fft,
-            hop_length=hop_size,
-            win_length=win_size,
-            window=hann_window[wnsize_dtype_device].cpu(),
-            center=center,
-            pad_mode="reflect",
-            normalized=False,
-            onesided=True,
-            return_complex=False,
-        ).to(device=y.device)
+        i = y.cpu()
+        win = hann_window[wnsize_dtype_device].cpu()
     else:
-        spec = torch.stft(
-            y,
-            n_fft,
-            hop_length=hop_size,
-            win_length=win_size,
-            window=hann_window[wnsize_dtype_device],
-            center=center,
-            pad_mode="reflect",
-            normalized=False,
-            onesided=True,
-            return_complex=False,
-        )
+        i = y
+        win = hann_window[wnsize_dtype_device]
+    spec = torch.stft(
+        i,
+        n_fft,
+        hop_length=hop_size,
+        win_length=win_size,
+        window=win,
+        center=center,
+        pad_mode="reflect",
+        normalized=False,
+        onesided=True,
+        return_complex=False,
+    ).to(device=y.device)
 
     spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
     return spec
@@ -99,71 +89,25 @@ def spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax):
         mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
             dtype=spec.dtype, device=spec.device
         )
-    spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
-    spec = spectral_normalize_torch(spec)
-    return spec
+    melspec = torch.matmul(mel_basis[fmax_dtype_device], spec)
+    melspec = spectral_normalize_torch(melspec)
+    return melspec
 
 
 def mel_spectrogram_torch(
     y, n_fft, num_mels, sampling_rate, hop_size, win_size, fmin, fmax, center=False
 ):
-    if torch.min(y) < -1.0:
-        print("min value is ", torch.min(y))
-    if torch.max(y) > 1.0:
-        print("max value is ", torch.max(y))
+    """Convert waveform into Mel-frequency Log-amplitude spectrogram.
 
-    global mel_basis, hann_window
-    dtype_device = str(y.dtype) + "_" + str(y.device)
-    fmax_dtype_device = str(fmax) + "_" + dtype_device
-    wnsize_dtype_device = str(win_size) + "_" + dtype_device
-    if fmax_dtype_device not in mel_basis:
-        mel = librosa_mel_fn(sampling_rate, n_fft, num_mels, fmin, fmax)
-        mel_basis[fmax_dtype_device] = torch.from_numpy(mel).to(
-            dtype=y.dtype, device=y.device
-        )
-    if wnsize_dtype_device not in hann_window:
-        hann_window[wnsize_dtype_device] = torch.hann_window(win_size).to(
-            dtype=y.dtype, device=y.device
-        )
+    Args:
+        y       :: (B, T)           - Waveforms
+    Returns:
+        melspec :: (B, Freq, Frame) - Mel-frequency Log-amplitude spectrogram
+    """
+    # Linear-frequency Linear-amplitude spectrogram :: (B, T) -> (B, Freq, Frame)
+    spec = spectrogram_torch(y, n_fft, sampling_rate, hop_size, win_size, center)
 
-    y = torch.nn.functional.pad(
-        y.unsqueeze(1),
-        (int((n_fft - hop_size) / 2), int((n_fft - hop_size) / 2)),
-        mode="reflect",
-    )
-    y = y.squeeze(1)
+    # Mel-frequency Log-amplitude spectrogram :: (B, Freq, Frame) -> (B, Freq=num_mels, Frame)
+    melspec = spec_to_mel_torch(spec, n_fft, num_mels, sampling_rate, fmin, fmax)
 
-    # 現在、mpsはtorch.stftをサポートしていない。
-    if y.device.type == "mps":
-        spec = torch.stft(
-            y.cpu(),
-            n_fft,
-            hop_length=hop_size,
-            win_length=win_size,
-            window=hann_window[wnsize_dtype_device].cpu(),
-            center=center,
-            pad_mode="reflect",
-            normalized=False,
-            onesided=True,
-            return_complex=False,
-        ).to(device=y.device)
-    else:
-        spec = torch.stft(
-            y,
-            n_fft,
-            hop_length=hop_size,
-            win_length=win_size,
-            window=hann_window[wnsize_dtype_device],
-            center=center,
-            pad_mode="reflect",
-            normalized=False,
-            onesided=True,
-            return_complex=False,
-        )
-
-    spec = torch.sqrt(spec.pow(2).sum(-1) + 1e-6)
-
-    spec = torch.matmul(mel_basis[fmax_dtype_device], spec)
-    spec = spectral_normalize_torch(spec)
-
-    return spec
+    return melspec

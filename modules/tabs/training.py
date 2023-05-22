@@ -31,6 +31,8 @@ class Training(Tab):
             target_sr,
             f0,
             dataset_glob,
+            recursive,
+            multiple_speakers,
             speaker_id,
             gpu_id,
             num_cpu_process,
@@ -38,9 +40,9 @@ class Training(Tab):
             pitch_extraction_algo,
             embedder_name,
             embedding_channels,
+            embedding_output_layer,
             ignore_cache,
         ):
-            embedding_channels = int(embedding_channels)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
@@ -52,7 +54,12 @@ class Training(Tab):
 
             os.makedirs(training_dir, exist_ok=True)
 
-            datasets = glob_dataset(dataset_glob, speaker_id)
+            datasets = glob_dataset(
+                dataset_glob,
+                speaker_id,
+                multiple_speakers=multiple_speakers,
+                recursive=recursive,
+            )
 
             yield "Preprocessing..."
             split.preprocess_audio(
@@ -61,6 +68,13 @@ class Training(Tab):
                 num_cpu_process,
                 training_dir,
                 norm_audio_when_preprocess,
+                os.path.join(
+                    MODELS_DIR,
+                    "training",
+                    "mute",
+                    "0_gt_wavs",
+                    f"mute{target_sr}.wav",
+                ),
             )
 
             if f0:
@@ -82,7 +96,8 @@ class Training(Tab):
                 training_dir,
                 embedder_filepath,
                 embedder_load_from,
-                embedding_channels == 768,
+                int(embedding_channels),
+                int(embedding_output_layer),
                 gpu_ids,
             )
 
@@ -93,16 +108,19 @@ class Training(Tab):
                 training_dir,
                 model_name,
                 out_dir,
-                embedding_channels,
+                int(embedding_channels),
             )
 
             yield "Training complete"
 
         def train_all(
             model_name,
+            version,
             sampling_rate_str,
             f0,
             dataset_glob,
+            recursive,
+            multiple_speakers,
             speaker_id,
             gpu_id,
             num_cpu_process,
@@ -117,11 +135,11 @@ class Training(Tab):
             pre_trained_bottom_model_d,
             embedder_name,
             embedding_channels,
+            embedding_output_layer,
             ignore_cache,
         ):
             batch_size = int(batch_size)
             num_epochs = int(num_epochs)
-            embedding_channels = int(embedding_channels)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
@@ -134,7 +152,12 @@ class Training(Tab):
 
             yield f"Training directory: {training_dir}"
 
-            datasets = glob_dataset(dataset_glob, speaker_id)
+            datasets = glob_dataset(
+                dataset_glob,
+                speaker_id,
+                multiple_speakers=multiple_speakers,
+                recursive=recursive,
+            )
 
             yield "Preprocessing..."
             split.preprocess_audio(
@@ -143,6 +166,13 @@ class Training(Tab):
                 num_cpu_process,
                 training_dir,
                 norm_audio_when_preprocess,
+                os.path.join(
+                    MODELS_DIR,
+                    "training",
+                    "mute",
+                    "0_gt_wavs",
+                    f"mute{sampling_rate_str}.wav",
+                ),
             )
 
             if f0:
@@ -164,19 +194,20 @@ class Training(Tab):
                 training_dir,
                 embedder_filepath,
                 embedder_load_from,
-                embedding_channels == 768,
+                int(embedding_channels),
+                int(embedding_output_layer),
                 gpu_ids,
                 None if len(gpu_ids) > 1 else device,
             )
 
-            create_dataset_meta(training_dir, sampling_rate_str, f0)
+            create_dataset_meta(training_dir, f0)
 
             yield "Training model..."
 
             print(f"train_all: emb_name: {embedder_name}")
 
             config = utils.load_config(
-                training_dir, sampling_rate_str, embedding_channels, fp16
+                version, training_dir, sampling_rate_str, embedding_channels, fp16
             )
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
@@ -187,7 +218,7 @@ class Training(Tab):
                 model_name,
                 out_dir,
                 sampling_rate_str,
-                1 if f0 else 0,
+                f0,
                 batch_size,
                 cache_batch,
                 num_epochs,
@@ -195,30 +226,46 @@ class Training(Tab):
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
+                int(embedding_output_layer),
                 False,
-                None if len(gpu_ids) > 0 else device,
+                None if len(gpu_ids) > 1 else device,
             )
 
             yield "Training index..."
 
-            train_index(training_dir, model_name, out_dir, embedding_channels)
+            train_index(training_dir, model_name, out_dir, int(embedding_channels))
 
             yield "Training completed"
 
         with gr.Group():
             with gr.Box():
                 with gr.Column():
-                    with gr.Row().style(equal_height=False):
-                        model_name = gr.Textbox(label="Model Name")
-                        ignore_cache = gr.Checkbox(label="Ignore cache")
-                        dataset_glob = gr.Textbox(
-                            label="Dataset glob", placeholder="data/**/*.wav"
-                        )
-                        speaker_id = gr.Slider(
-                            maximum=4, minimum=0, value=0, step=1, label="Speaker ID"
-                        )
+                    with gr.Row().style():
+                        with gr.Column():
+                            model_name = gr.Textbox(label="Model Name")
+                            ignore_cache = gr.Checkbox(label="Ignore cache")
+                        with gr.Column():
+                            dataset_glob = gr.Textbox(
+                                label="Dataset glob", placeholder="data/**/*.wav"
+                            )
+                            recursive = gr.Checkbox(label="Recursive", value=True)
+                            multiple_speakers = gr.Checkbox(
+                                label="Multiple speakers", value=False
+                            )
+                            speaker_id = gr.Slider(
+                                maximum=4,
+                                minimum=0,
+                                value=0,
+                                step=1,
+                                label="Speaker ID",
+                            )
 
                     with gr.Row().style(equal_height=False):
+                        version = gr.Radio(
+                            choices=["v1", "v2"],
+                            value="v2",
+                            label="Model version",
+                        )
                         target_sr = gr.Radio(
                             choices=["32k", "40k", "48k"],
                             value="40k",
@@ -229,15 +276,21 @@ class Training(Tab):
                             value="Yes",
                             label="f0 Model",
                         )
-                        embedder_name = gr.Radio(
+                    with gr.Row().style(equal_height=False):
+                        embedding_name = gr.Radio(
                             choices=list(models.EMBEDDINGS_LIST.keys()),
                             value="contentvec",
                             label="Using phone embedder",
                         )
                         embedding_channels = gr.Radio(
                             choices=["256", "768"],
-                            value="256",
+                            value="768",
                             label="Embedding channels",
+                        )
+                        embedding_output_layer = gr.Radio(
+                            choices=["9", "12"],
+                            value="12",
+                            label="Embedding output layer",
                         )
                     with gr.Row().style(equal_height=False):
                         gpu_id = gr.Textbox(
@@ -282,13 +335,13 @@ class Training(Tab):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
                             value=os.path.join(
-                                MODELS_DIR, "pretrained", "f0G40k256.pth"
+                                MODELS_DIR, "pretrained", "v2", "f0G40k.pth"
                             ),
                         )
                         pre_trained_discriminator = gr.Textbox(
                             label="Pre trained discriminator path",
                             value=os.path.join(
-                                MODELS_DIR, "pretrained", "f0D40k256.pth"
+                                MODELS_DIR, "pretrained", "v2", "f0D40k.pth"
                             ),
                         )
 
@@ -298,32 +351,6 @@ class Training(Tab):
                         train_index_button = gr.Button("Train Index", variant="primary")
                         train_all_button = gr.Button("Train", variant="primary")
 
-        def change_pretrained(sr, f0, emb_channels):
-            f0 = f0 == "Yes"
-            g = f"f0G{sr}{emb_channels}.pth" if f0 else f"G{sr}{emb_channels}.pth"
-            d = f"f0D{sr}{emb_channels}.pth" if f0 else f"D{sr}{emb_channels}.pth"
-
-            return gr.Textbox.update(
-                value=os.path.join(MODELS_DIR, "pretrained", g)
-            ), gr.Textbox.update(value=os.path.join(MODELS_DIR, "pretrained", d))
-
-        change_pretrained_options = {
-            "fn": change_pretrained,
-            "inputs": [
-                target_sr,
-                f0,
-                embedding_channels,
-            ],
-            "outputs": [
-                pre_trained_generator,
-                pre_trained_discriminator,
-            ],
-        }
-
-        target_sr.change(**change_pretrained_options)
-        f0.change(**change_pretrained_options)
-        embedding_channels.change(**change_pretrained_options)
-
         train_index_button.click(
             train_index_only,
             inputs=[
@@ -331,13 +358,16 @@ class Training(Tab):
                 target_sr,
                 f0,
                 dataset_glob,
+                recursive,
+                multiple_speakers,
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
-                embedder_name,
+                embedding_name,
                 embedding_channels,
+                embedding_output_layer,
                 ignore_cache,
             ],
             outputs=[status],
@@ -347,9 +377,12 @@ class Training(Tab):
             train_all,
             inputs=[
                 model_name,
+                version,
                 target_sr,
                 f0,
                 dataset_glob,
+                recursive,
+                multiple_speakers,
                 speaker_id,
                 gpu_id,
                 num_cpu_process,
@@ -362,8 +395,9 @@ class Training(Tab):
                 fp16,
                 pre_trained_generator,
                 pre_trained_discriminator,
-                embedder_name,
+                embedding_name,
                 embedding_channels,
+                embedding_output_layer,
                 ignore_cache,
             ],
             outputs=[status],

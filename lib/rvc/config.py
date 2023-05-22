@@ -52,6 +52,7 @@ class TrainConfigModel(BaseModel):
 
 
 class TrainConfig(BaseModel):
+    version: Literal["v1", "v2"] = "v2"
     train: TrainConfigTrain
     data: TrainConfigData
     model: TrainConfigModel

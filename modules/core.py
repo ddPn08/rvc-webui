@@ -38,26 +38,25 @@ def download_models():
         hash = calc_sha256(out)
         return etag == hash
 
+    os.makedirs(os.path.join(MODELS_DIR, "pretrained", 'v2'), exist_ok=True)
+
     tasks = []
     for template in [
-        "D{}k{}",
-        "G{}k{}",
-        "f0D{}k{}",
-        "f0G{}k{}",
+        "D{}k",
+        "G{}k",
+        "f0D{}k",
+        "f0G{}k",
     ]:
-        for sr in ["32", "40", "48"]:
-            for emb_channels in ["256", "768"]:
-                basename = template.format(sr, emb_channels)
-                url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/{basename}.pth"
-                out = os.path.join(MODELS_DIR, "pretrained", f"{basename}.pth")
+        basename = template.format("40")
+        url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/v2/{basename}.pth"
+        out = os.path.join(MODELS_DIR, "pretrained", 'v2', f"{basename}.pth")
 
-                if hash_check(url, out):
-                    continue
+        if hash_check(url, out):
+            continue
 
-                tasks.append((url, out))
+        tasks.append((url, out))
 
     for filename in [
-        "hubert_base.pt",
         "checkpoint_best_legacy_500.pt",
     ]:
         out = os.path.join(MODELS_DIR, "embeddings", filename)

@@ -70,10 +70,12 @@ def merge(
             merged["weight"][key] = merge_weight(weight_a[key], weight_b[key], None, a)
     merged["config"] = state_dict["config"]
     merged["params"] = state_dict["params"] if "params" in state_dict else None
+    merged["version"] = state_dict.get("version", "v1")
     merged["sr"] = state_dict["sr"]
     merged["f0"] = state_dict["f0"]
     merged["info"] = state_dict["info"]
     merged["embedder_name"] = (
         state_dict["embedder_name"] if "embedder_name" in state_dict else None
     )
+    merged["embedder_output_layer"] = state_dict.get("embedder_output_layer", "12")
     return merged
