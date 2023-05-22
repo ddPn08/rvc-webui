@@ -61,6 +61,9 @@ class Training(Tab):
                 recursive=recursive,
             )
 
+            if len(datasets) == 0:
+                raise Exception("No audio files found")
+
             yield "Preprocessing..."
             split.preprocess_audio(
                 datasets,
@@ -158,6 +161,9 @@ class Training(Tab):
                 multiple_speakers=multiple_speakers,
                 recursive=recursive,
             )
+
+            if len(datasets) == 0:
+                raise Exception("No audio files found")
 
             yield "Preprocessing..."
             split.preprocess_audio(
