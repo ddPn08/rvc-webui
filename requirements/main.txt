@@ -6,7 +6,6 @@ fairseq==0.12.2
 matplotlib==3.7.1
 scipy==1.9.3
 librosa==0.9.2
-praat-parselmouth==0.4.3
 pyworld==0.3.2
 soundfile==0.12.1
 ffmpeg-python==0.2.0

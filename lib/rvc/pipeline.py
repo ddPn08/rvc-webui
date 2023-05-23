@@ -4,7 +4,6 @@ from typing import *
 
 import faiss
 import numpy as np
-import parselmouth
 import pyworld
 import scipy.signal as signal
 import torch
@@ -67,23 +66,8 @@ class VocalConvertPipeline(object):
         f0_max = 1100
         f0_mel_min = 1127 * np.log(1 + f0_min / 700)
         f0_mel_max = 1127 * np.log(1 + f0_max / 700)
-        if f0_method == "pm":
-            f0 = (
-                parselmouth.Sound(x, self.sr)
-                .to_pitch_ac(
-                    time_step=time_step / 1000,
-                    voicing_threshold=0.6,
-                    pitch_floor=f0_min,
-                    pitch_ceiling=f0_max,
-                )
-                .selected_array["frequency"]
-            )
-            pad_size = (p_len - len(f0) + 1) // 2
-            if pad_size > 0 or p_len - len(f0) - pad_size > 0:
-                f0 = np.pad(
-                    f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
-                )
-        elif f0_method == "harvest":
+
+        if f0_method == "harvest":
             f0, t = pyworld.harvest(
                 x.astype(np.double),
                 fs=self.sr,
@@ -93,6 +77,17 @@ class VocalConvertPipeline(object):
             )
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
             f0 = signal.medfilt(f0, 3)
+        elif f0_method == "dio":
+            f0, t = pyworld.dio(
+                x.astype(np.double),
+                fs=self.sr,
+                f0_ceil=f0_max,
+                f0_floor=f0_min,
+                frame_period=10,
+            )
+            f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
+            f0 = signal.medfilt(f0, 3)
+
         f0 *= pow(2, f0_up_key / 12)
         tf0 = self.sr // self.window  # f0 points per second
         if inp_f0 is not None:
