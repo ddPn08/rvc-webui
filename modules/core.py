@@ -38,7 +38,7 @@ def download_models():
         hash = calc_sha256(out)
         return etag == hash
 
-    os.makedirs(os.path.join(MODELS_DIR, "pretrained", 'v2'), exist_ok=True)
+    os.makedirs(os.path.join(MODELS_DIR, "pretrained", "v2"), exist_ok=True)
 
     tasks = []
     for template in [
@@ -49,7 +49,7 @@ def download_models():
     ]:
         basename = template.format("40")
         url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/v2/{basename}.pth"
-        out = os.path.join(MODELS_DIR, "pretrained", 'v2', f"{basename}.pth")
+        out = os.path.join(MODELS_DIR, "pretrained", "v2", f"{basename}.pth")
 
         if hash_check(url, out):
             continue
