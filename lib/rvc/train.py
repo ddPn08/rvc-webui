@@ -29,18 +29,28 @@ from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
 from .models import (MultiPeriodDiscriminator, SynthesizerTrnMs256NSFSid,
                      SynthesizerTrnMs256NSFSidNono)
 
-audio_exts = [
-    ".wav",
-    ".flac",
-    ".ogg",
-    ".mp3",
-    ".m4a",
-    ".wma",
-    ".aiff",
-]
+
+def is_audio_file(file: str):
+    if "." not in file:
+        return False
+    ext = os.path.splitext(file)[1]
+    return ext.lower() in [
+        ".wav",
+        ".flac",
+        ".ogg",
+        ".mp3",
+        ".m4a",
+        ".wma",
+        ".aiff",
+    ]
 
 
-def glob_dataset(glob_str: str, speaker_id: int, multiple_speakers: bool = False, recursive: bool = True):
+def glob_dataset(
+    glob_str: str,
+    speaker_id: int,
+    multiple_speakers: bool = False,
+    recursive: bool = True,
+):
     globs = glob_str.split(",")
     datasets_speakers = []
     for glob_str in globs:
@@ -63,7 +73,7 @@ def glob_dataset(glob_str: str, speaker_id: int, multiple_speakers: bool = False
                         for file in glob.iglob(
                             os.path.join(dir[0], "*"), recursive=recursive
                         )
-                        if os.path.splitext(file)[1] in audio_exts
+                        if is_audio_file(file)
                     ]
                     continue
 
@@ -73,7 +83,7 @@ def glob_dataset(glob_str: str, speaker_id: int, multiple_speakers: bool = False
             [
                 (file, speaker_id)
                 for file in glob.iglob(glob_str, recursive=recursive)
-                if os.path.splitext(file)[1] in audio_exts
+                if is_audio_file(file)
             ]
         )
 
