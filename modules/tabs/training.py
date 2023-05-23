@@ -6,7 +6,8 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
-from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from lib.rvc.train import (create_dataset_meta, glob_dataset, train_index,
+                           train_model)
 from modules import models, utils
 from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
@@ -316,7 +317,7 @@ class Training(Tab):
                             label="Normalize audio volume when preprocess",
                         )
                         pitch_extraction_algo = gr.Radio(
-                            choices=["pm", "harvest", "dio"],
+                            choices=["dio", "harvest"],
                             value="harvest",
                             label="Pitch extraction algorithm",
                         )
