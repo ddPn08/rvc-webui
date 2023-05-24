@@ -214,7 +214,7 @@ class Training(Tab):
             print(f"train_all: emb_name: {embedder_name}")
 
             config = utils.load_config(
-                version, training_dir, sampling_rate_str, embedding_channels, fp16
+                version, training_dir, sampling_rate_str, int(embedding_channels), fp16
             )
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
