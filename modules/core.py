@@ -41,6 +41,22 @@ def download_models():
     os.makedirs(os.path.join(MODELS_DIR, "pretrained", "v2"), exist_ok=True)
 
     tasks = []
+    for basename in [
+        f"{f0}{net}{rate}k{channels}"
+        for f0 in ["", "f0"]
+        for net in ["D", "G"]
+        for rate in [32, 40, 48]
+        for channels in [256, 768]
+    ]:
+
+        url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/v1/{basename}.pth"
+        out = os.path.join(MODELS_DIR, "pretrained", f"{basename}.pth")
+
+        if hash_check(url, out):
+            continue
+
+        tasks.append((url, out))
+
     for template in [
         "D{}k",
         "G{}k",
@@ -48,6 +64,7 @@ def download_models():
         "f0G{}k",
     ]:
         basename = template.format("40")
+
         url = f"https://huggingface.co/ddPn08/rvc-webui-models/resolve/main/pretrained/v2/{basename}.pth"
         out = os.path.join(MODELS_DIR, "pretrained", "v2", f"{basename}.pth")
 
