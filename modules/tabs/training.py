@@ -6,7 +6,8 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
-from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from lib.rvc.train import (create_dataset_meta, glob_dataset, train_index,
+                           train_model)
 from modules import models, utils
 from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
@@ -38,13 +39,19 @@ class Training(Tab):
             num_cpu_process,
             norm_audio_when_preprocess,
             pitch_extraction_algo,
+            run_train_index,
+            reduce_index_size,
+            maximum_index_size,
             embedder_name,
             embedding_channels,
             embedding_output_layer,
             ignore_cache,
         ):
+            maximum_index_size = int(maximum_index_size)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
+            run_train_index = run_train_index == "Yes"
+            reduce_index_size = reduce_index_size == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
             yield f"Training directory: {training_dir}"
@@ -107,12 +114,17 @@ class Training(Tab):
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
             yield "Training index..."
-            train_index(
-                training_dir,
-                model_name,
-                out_dir,
-                int(embedding_channels),
-            )
+            if run_train_index:
+                if not reduce_index_size:
+                    maximum_index_size = None
+                train_index(
+                    training_dir,
+                    model_name,
+                    out_dir,
+                    int(embedding_channels),
+                    num_cpu_process,
+                    maximum_index_size,
+                )
 
             yield "Training complete"
 
@@ -136,6 +148,9 @@ class Training(Tab):
             fp16,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
+            run_train_index,
+            reduce_index_size,
+            maximum_index_size,
             embedder_name,
             embedding_channels,
             embedding_output_layer,
@@ -143,8 +158,11 @@ class Training(Tab):
         ):
             batch_size = int(batch_size)
             num_epochs = int(num_epochs)
+            maximum_index_size = int(maximum_index_size)
             f0 = f0 == "Yes"
             norm_audio_when_preprocess = norm_audio_when_preprocess == "Yes"
+            run_train_index = run_train_index == "Yes"
+            reduce_index_size = reduce_index_size == "Yes"
             training_dir = os.path.join(MODELS_DIR, "training", "models", model_name)
             gpu_ids = [int(x.strip()) for x in gpu_id.split(",")] if gpu_id else []
 
@@ -238,8 +256,17 @@ class Training(Tab):
             )
 
             yield "Training index..."
-
-            train_index(training_dir, model_name, out_dir, int(embedding_channels))
+            if run_train_index:
+                if not reduce_index_size:
+                    maximum_index_size = None
+                train_index(
+                    training_dir,
+                    model_name,
+                    out_dir,
+                    int(embedding_channels),
+                    num_cpu_process,
+                    maximum_index_size,
+                )
 
             yield "Training completed"
 
@@ -316,16 +343,13 @@ class Training(Tab):
                             label="Normalize audio volume when preprocess",
                         )
                         pitch_extraction_algo = gr.Radio(
-                            choices=["pm", "harvest", "dio"],
+                            choices=["dio", "harvest"],
                             value="harvest",
                             label="Pitch extraction algorithm",
                         )
                     with gr.Row().style(equal_height=False):
                         batch_size = gr.Number(value=4, label="Batch size")
-                        num_epochs = gr.Number(
-                            value=30,
-                            label="Number of epochs",
-                        )
+                        num_epochs = gr.Number(value=30, label="Number of epochs",)
                         save_every_epoch = gr.Slider(
                             minimum=0,
                             maximum=100,
@@ -350,6 +374,18 @@ class Training(Tab):
                                 MODELS_DIR, "pretrained", "v2", "f0D40k.pth"
                             ),
                         )
+                    with gr.Row().style(equal_height=False):
+                        run_train_index = gr.Radio(
+                            choices=["Yes", "No"], value="Yes", label="Train Index",
+                        )
+                        reduce_index_size = gr.Radio(
+                            choices=["Yes", "No"],
+                            value="No",
+                            label="Reduce index size with kmeans",
+                        )
+                        maximum_index_size = gr.Number(
+                            value=10000, label="maximum index size"
+                        )
 
                     with gr.Row().style(equal_height=False):
                         status = gr.Textbox(value="", label="Status")
@@ -371,6 +407,9 @@ class Training(Tab):
                 num_cpu_process,
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
+                run_train_index,
+                reduce_index_size,
+                maximum_index_size,
                 embedding_name,
                 embedding_channels,
                 embedding_output_layer,
@@ -401,6 +440,9 @@ class Training(Tab):
                 fp16,
                 pre_trained_generator,
                 pre_trained_discriminator,
+                run_train_index,
+                reduce_index_size,
+                maximum_index_size,
                 embedding_name,
                 embedding_channels,
                 embedding_output_layer,

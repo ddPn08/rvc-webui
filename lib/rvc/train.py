@@ -12,6 +12,7 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import tqdm
+from sklearn.cluster import MiniBatchKMeans
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -21,20 +22,13 @@ from torch.utils.tensorboard import SummaryWriter
 from . import commons, utils
 from .checkpoints import save
 from .config import DatasetMetadata, TrainConfig
-from .data_utils import (
-    DistributedBucketSampler,
-    TextAudioCollate,
-    TextAudioCollateMultiNSFsid,
-    TextAudioLoader,
-    TextAudioLoaderMultiNSFsid,
-)
+from .data_utils import (DistributedBucketSampler, TextAudioCollate,
+                         TextAudioCollateMultiNSFsid, TextAudioLoader,
+                         TextAudioLoaderMultiNSFsid)
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import (
-    MultiPeriodDiscriminator,
-    SynthesizerTrnMs256NSFSid,
-    SynthesizerTrnMs256NSFSidNono,
-)
+from .models import (MultiPeriodDiscriminator, SynthesizerTrnMs256NSFSid,
+                     SynthesizerTrnMs256NSFSidNono)
 
 
 def is_audio_file(file: str):
@@ -148,7 +142,7 @@ def create_dataset_meta(training_dir: str, f0: bool):
         json.dump(meta, f, indent=2)
 
 
-def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int):
+def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int, num_cpu_process: int, maximum_index_size: Optional[int]):
     checkpoint_path = os.path.join(out_dir, model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
     index_dir = os.path.join(os.path.dirname(checkpoint_path), f"{model_name}_index")
@@ -167,29 +161,32 @@ def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int):
             phone = np.load(os.path.join(feature_256_spk_dir, name))
             npys.append(phone)
 
-        # # shuffle big_npy to prevent reproducing the sound source
-        # big_npy = np.concatenate(npys, 0)
-        # big_npy_idx = np.arange(big_npy.shape[0])
-        # np.random.shuffle(big_npy_idx)
-        # big_npy = big_npy[big_npy_idx]
-
-        # # recommend parameter in https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
-        # emb_ch = big_npy.shape[1]
-        # emb_ch_half = emb_ch // 2
-        # n_ivf = int(8 * np.sqrt(big_npy.shape[0]))
-        # index = faiss.index_factory(emb_ch, f"IVF{n_ivf},PQ{emb_ch_half}x4fsr,RFlat")
-
         # shuffle big_npy to prevent reproducing the sound source
         big_npy = np.concatenate(npys, 0)
         big_npy_idx = np.arange(big_npy.shape[0])
         np.random.shuffle(big_npy_idx)
         big_npy = big_npy[big_npy_idx]
 
+        if not maximum_index_size is None and big_npy.shape[0] > maximum_index_size:
+            kmeans = MiniBatchKMeans(
+                n_clusters=maximum_index_size,
+                batch_size=256 * num_cpu_process,
+                init="random",
+                compute_labels=False,
+            )
+            kmeans.fit(big_npy)
+            big_npy = kmeans.cluster_centers_
+
         # recommend parameter in https://github.com/facebookresearch/faiss/wiki/Guidelines-to-choose-an-index
         emb_ch = big_npy.shape[1]
         emb_ch_half = emb_ch // 2
         n_ivf = int(8 * np.sqrt(big_npy.shape[0]))
-        index = faiss.index_factory(emb_ch, f"IVF{n_ivf},PQ{emb_ch_half}x4fsr,RFlat")
+        if big_npy.shape[0] >= 1_000_000:
+            index = faiss.index_factory(
+                emb_ch, f"IVF{n_ivf},PQ{emb_ch_half}x4fsr,RFlat"
+            )
+        else:
+            index = faiss.index_factory(emb_ch, f"IVF{n_ivf},Flat")
 
         index.train(big_npy)
         batch_size_add = 8192
@@ -550,20 +547,24 @@ def training_runner(
                 ) = batch
 
             if not use_cache:
-                phone, phone_lengths = phone.to(
-                    device=device, non_blocking=True
-                ), phone_lengths.to(device=device, non_blocking=True)
+                phone, phone_lengths = (
+                    phone.to(device=device, non_blocking=True),
+                    phone_lengths.to(device=device, non_blocking=True),
+                )
                 if f0:
-                    pitch, pitchf = pitch.to(
-                        device=device, non_blocking=True
-                    ), pitchf.to(device=device, non_blocking=True)
+                    pitch, pitchf = (
+                        pitch.to(device=device, non_blocking=True),
+                        pitchf.to(device=device, non_blocking=True),
+                    )
                 sid = sid.to(device=device, non_blocking=True)
-                spec, spec_lengths = spec.to(
-                    device=device, non_blocking=True
-                ), spec_lengths.to(device=device, non_blocking=True)
-                wave, wave_lengths = wave.to(
-                    device=device, non_blocking=True
-                ), wave_lengths.to(device=device, non_blocking=True)
+                spec, spec_lengths = (
+                    spec.to(device=device, non_blocking=True),
+                    spec_lengths.to(device=device, non_blocking=True),
+                )
+                wave, wave_lengths = (
+                    wave.to(device=device, non_blocking=True),
+                    wave_lengths.to(device=device, non_blocking=True),
+                )
                 if cache_in_gpu:
                     if f0:
                         cache.append(
