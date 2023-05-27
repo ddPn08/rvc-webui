@@ -22,8 +22,8 @@ def inference_options_ui(show_out_dir=True):
                 minimum=-20, maximum=20, value=0, step=1, label="Transpose"
             )
             pitch_extraction_algo = gr.Radio(
-                choices=["dio", "harvest"],
-                value="dio",
+                choices=["pm", "harvest"],
+                value="pm",
                 label="Pitch Extraction Algorithm",
             )
             embedding_model = gr.Radio(

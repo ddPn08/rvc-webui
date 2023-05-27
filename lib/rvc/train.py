@@ -142,7 +142,14 @@ def create_dataset_meta(training_dir: str, f0: bool):
         json.dump(meta, f, indent=2)
 
 
-def train_index(training_dir: str, model_name: str, out_dir: str, emb_ch: int, num_cpu_process: int, maximum_index_size: Optional[int]):
+def train_index(
+    training_dir: str,
+    model_name: str,
+    out_dir: str,
+    emb_ch: int,
+    num_cpu_process: int,
+    maximum_index_size: Optional[int],
+):
     checkpoint_path = os.path.join(out_dir, model_name)
     feature_256_dir = os.path.join(training_dir, "3_feature256")
     index_dir = os.path.join(os.path.dirname(checkpoint_path), f"{model_name}_index")
