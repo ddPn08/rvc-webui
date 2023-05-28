@@ -10,8 +10,6 @@ import torch
 import torch.nn.functional as F
 from fairseq import checkpoint_utils
 from tqdm import tqdm
-from transformers import HubertModel as TrHubertModel
-from transformers import Wav2Vec2FeatureExtractor
 
 
 def load_embedder(embedder_path: str, device):
@@ -32,42 +30,6 @@ def load_embedder(embedder_path: str, device):
         traceback.print_exc()
 
     return embedder_model, cfg
-
-
-def load_transformers_hubert(repo_name: str, device):
-    try:
-        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(repo_name)
-        embedder_model = TrHubertModel.from_pretrained(repo_name).to(device)
-        if device != "cpu":
-            embedder_model = embedder_model.half()
-        else:
-            embedder_model = embedder_model.float()
-        embedder_model.eval()
-    except Exception as e:
-        print(f"Error: {e} {repo_name}")
-        traceback.print_exc()
-
-    return (feature_extractor, embedder_model), None
-
-
-def load_transformers_hubert_local(embedder_path: str, device):
-    try:
-        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-            embedder_path, local_files_only=True
-        )
-        embedder_model = TrHubertModel.from_pretrained(
-            embedder_path, local_files_only=True
-        ).to(device)
-        if device != "cpu":
-            embedder_model = embedder_model.half()
-        else:
-            embedder_model = embedder_model.float()
-        embedder_model.eval()
-    except Exception as e:
-        print(f"Error: {e} {embedder_path}")
-        traceback.print_exc()
-
-    return (feature_extractor, embedder_model), None
 
 
 # wave must be 16k, hop_size=320
@@ -104,12 +66,7 @@ def processor(
     if embedder_load_from == "local" and not os.path.exists(embedder_path):
         return f"Embedder not found: {embedder_path}"
 
-    if embedder_load_from == "hf":
-        model, cfg = load_transformers_hubert(embedder_path, device)
-    elif embedder_load_from == "tr-local":
-        model, cfg = load_transformers_hubert_local(embedder_path, device)
-    else:
-        model, cfg = load_embedder(embedder_path, device)
+    model, cfg = load_embedder(embedder_path, device)
 
     for file in tqdm(todo, position=1 + process_id):
         try:

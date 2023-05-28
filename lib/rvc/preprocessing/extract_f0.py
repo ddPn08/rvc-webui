@@ -19,7 +19,6 @@ def compute_f0(
     f0_min: float,
 ):
     x = load_audio(path, fs)
-    p_len = x.shape[0] // hop
     if f0_method == "harvest":
         f0, t = pyworld.harvest(
             x.astype(np.double),

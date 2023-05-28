@@ -11,8 +11,6 @@ import torch.nn.functional as F
 
 # from faiss.swigfaiss_avx2 import IndexIVFFlat # cause crash on windows' faiss-cpu installed from pip
 from fairseq.models.hubert import HubertModel
-from transformers import HubertModel as TrHubertModel
-from transformers import Wav2Vec2FeatureExtractor
 
 from .models import SynthesizerTrnMs256NSFSid
 
@@ -61,7 +59,6 @@ class VocalConvertPipeline(object):
         f0_method: str,
         inp_f0: np.ndarray = None,
     ):
-        time_step = self.window / self.sr * 1000
         f0_min = 50
         f0_max = 1100
         f0_mel_min = 1127 * np.log(1 + f0_min / 700)
@@ -114,7 +111,7 @@ class VocalConvertPipeline(object):
 
     def _convert(
         self,
-        model: Union[HubertModel, Tuple[Wav2Vec2FeatureExtractor, TrHubertModel]],
+        model: HubertModel,
         embedding_output_layer: int,
         net_g: SynthesizerTrnMs256NSFSid,
         sid: int,
@@ -231,7 +228,7 @@ class VocalConvertPipeline(object):
 
     def __call__(
         self,
-        model: Union[HubertModel, Tuple[Wav2Vec2FeatureExtractor, TrHubertModel]],
+        model: HubertModel,
         embedding_output_layer: int,
         net_g: SynthesizerTrnMs256NSFSid,
         sid: int,
