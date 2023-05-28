@@ -6,8 +6,7 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
-from lib.rvc.train import (create_dataset_meta, glob_dataset, train_index,
-                           train_model)
+from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
 from modules import models, utils
 from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
@@ -349,7 +348,10 @@ class Training(Tab):
                         )
                     with gr.Row().style(equal_height=False):
                         batch_size = gr.Number(value=4, label="Batch size")
-                        num_epochs = gr.Number(value=30, label="Number of epochs",)
+                        num_epochs = gr.Number(
+                            value=30,
+                            label="Number of epochs",
+                        )
                         save_every_epoch = gr.Slider(
                             minimum=0,
                             maximum=100,
@@ -376,7 +378,9 @@ class Training(Tab):
                         )
                     with gr.Row().style(equal_height=False):
                         run_train_index = gr.Radio(
-                            choices=["Yes", "No"], value="Yes", label="Train Index",
+                            choices=["Yes", "No"],
+                            value="Yes",
+                            label="Train Index",
                         )
                         reduce_index_size = gr.Radio(
                             choices=["Yes", "No"],

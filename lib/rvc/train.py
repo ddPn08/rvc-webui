@@ -22,13 +22,20 @@ from torch.utils.tensorboard import SummaryWriter
 from . import commons, utils
 from .checkpoints import save
 from .config import DatasetMetadata, TrainConfig
-from .data_utils import (DistributedBucketSampler, TextAudioCollate,
-                         TextAudioCollateMultiNSFsid, TextAudioLoader,
-                         TextAudioLoaderMultiNSFsid)
+from .data_utils import (
+    DistributedBucketSampler,
+    TextAudioCollate,
+    TextAudioCollateMultiNSFsid,
+    TextAudioLoader,
+    TextAudioLoaderMultiNSFsid,
+)
 from .losses import discriminator_loss, feature_loss, generator_loss, kl_loss
 from .mel_processing import mel_spectrogram_torch, spec_to_mel_torch
-from .models import (MultiPeriodDiscriminator, SynthesizerTrnMs256NSFSid,
-                     SynthesizerTrnMs256NSFSidNono)
+from .models import (
+    MultiPeriodDiscriminator,
+    SynthesizerTrnMs256NSFSid,
+    SynthesizerTrnMs256NSFSidNono,
+)
 
 
 def is_audio_file(file: str):
