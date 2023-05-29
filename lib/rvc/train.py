@@ -145,14 +145,14 @@ def create_dataset_meta(training_dir: str, f0: bool):
         json.dump(meta, f, indent=2)
 
 
-def change_speaker(net_g, embedder, embedding_output_layer, phone, phone_lengths, pitch, pitchf, spec_lengths, sid):
+def change_speaker(net_g, speaker_info, embedder, embedding_output_layer, phone, phone_lengths, pitch, pitchf, spec_lengths):
     """
     random change formant
     inspired by https://github.com/auspicious3000/contentvec/blob/d746688a32940f4bee410ed7c87ec9cf8ff04f74/contentvec/data/audio/audio_utils_1.py#L179
     """
-    N = pitchf.shape[0]
-    device = pitchf.device
-    dtype = pitchf.dtype
+    N = phone.shape[0]
+    device = phone.device
+    dtype = phone.dtype
 
     f0_bin = 256
     f0_max = 1100.0
@@ -165,15 +165,13 @@ def change_speaker(net_g, embedder, embedding_output_layer, phone, phone_lengths
     hi = 250. + 150. * (pitch_median >= 200).to(dtype=dtype)
     pitch_median = torch.clip(pitch_median, lo, hi).unsqueeze(1)
 
-    ratio_speaker = torch.pow(.5, 2. * torch.rand(N)).unsqueeze(1).to(device, dtype)  # 変更後の話者にピッチの中央値を[.25, .1]の割合で合わせる
     shift_pitch = torch.exp2((1. - 2. * torch.rand(N)) / 2).unsqueeze(1).to(device, dtype)   # ピッチを1オクターブの範囲でずらす
 
-    shuffle_ixs = np.arange(N)
-    np.random.shuffle(shuffle_ixs)
+    new_sid = np.random.choice(np.arange(len(speaker_info))[speaker_info > 0], size=N)
     rel_pitch = pitchf / pitch_median
-    new_pitch_median = torch.exp2(torch.log2(pitch_median[shuffle_ixs]) * ratio_speaker + torch.log2(pitch_median) *(1. - ratio_speaker)) * shift_pitch
+    new_pitch_median = torch.from_numpy(speaker_info[new_sid]).to(device, dtype).unsqueeze(1) * shift_pitch
     new_pitchf = new_pitch_median * rel_pitch
-    new_sid = sid[shuffle_ixs]
+    new_sid = torch.from_numpy(new_sid).to(device)
 
     new_pitch = 1127. * torch.log(1. + new_pitchf / 700.)
     new_pitch = (pitch - f0_mel_min) * (f0_bin - 2.) / (f0_mel_max - f0_mel_min) + 1.
@@ -188,6 +186,39 @@ def change_speaker(net_g, embedder, embedding_output_layer, phone, phone_lengths
         "padding_mask": padding_mask.to(device),
         "output_layer": embedding_output_layer
     }
+    logits = embedder.extract_features(**inputs)
+    if phone.shape[-1] == 768:
+        feats = logits[0]
+    else:
+        feats = embedder.final_proj(logits[0])
+    feats = torch.repeat_interleave(feats, 2, 1)
+    new_phone = torch.zeros(phone.shape).to(device, dtype)
+    new_phone[:, :feats.shape[1]] = feats[:, :phone.shape[1]]
+    return new_phone.to(device)
+
+
+def change_speaker_nono(net_g, embedder, embedding_output_layer, phone, phone_lengths, spec_lengths):
+    """
+    random change formant
+    inspired by https://github.com/auspicious3000/contentvec/blob/d746688a32940f4bee410ed7c87ec9cf8ff04f74/contentvec/data/audio/audio_utils_1.py#L179
+    """
+    N = phone.shape[0]
+    device = phone.device
+    dtype = phone.dtype
+
+    new_sid = np.random.randint(net_g.spk_embed_dim, size=N)
+    new_sid = torch.from_numpy(new_sid).to(device)
+
+    new_wave = net_g.infer(phone, phone_lengths, new_sid)[0]
+    new_wave_16k = torchaudio.functional.resample(new_wave, net_g.sr, 16000, rolloff=0.99).squeeze(1)
+    padding_mask = torch.arange(new_wave_16k.shape[1]).unsqueeze(0).to(device) > (spec_lengths.unsqueeze(1) * 160).to(device)
+
+    inputs = {
+        "source": new_wave_16k.to(device, dtype),
+        "padding_mask": padding_mask.to(device),
+        "output_layer": embedding_output_layer
+    }
+
     logits = embedder.extract_features(**inputs)
     if phone.shape[-1] == 768:
         feats = logits[0]
@@ -276,6 +307,8 @@ def train_model(
     f0: bool,
     batch_size: int,
     augment: bool,
+    augment_path: Optional[str],
+    speaker_info_path: Optional[str],
     cache_batch: bool,
     total_epoch: int,
     save_every_epoch: int,
@@ -313,6 +346,8 @@ def train_model(
             f0,
             batch_size,
             augment,
+            augment_path,
+            speaker_info_path,
             cache_batch,
             total_epoch,
             save_every_epoch,
@@ -337,6 +372,8 @@ def train_model(
                 f0,
                 batch_size,
                 augment,
+                augment_path,
+                speaker_info_path,
                 cache_batch,
                 total_epoch,
                 save_every_epoch,
@@ -373,6 +410,8 @@ def training_runner(
     f0: bool,
     batch_size: int,
     augment: bool,
+    augment_path: Optional[str],
+    speaker_info_path: Optional[str],
     cache_in_gpu: bool,
     total_epoch: int,
     save_every_epoch: int,
@@ -412,17 +451,6 @@ def training_runner(
         torch.cuda.set_device(rank)
 
     torch.manual_seed(config.train.seed)
-
-    if augment:
-        embedder_filepath, _, embedder_load_from = get_embedder(embedder_name)
-
-        if embedder_load_from == "local":
-            embedder_filepath = os.path.join(
-                MODELS_DIR, "embeddings", embedder_filepath
-            )
-        embedder, _ = load_embedder(embedder_filepath, device)
-        if not config.train.fp16_run:
-            embedder = embedder.float()
 
     if f0:
         train_dataset = TextAudioLoaderMultiNSFsid(training_meta, config.data)
@@ -504,6 +532,47 @@ def training_runner(
 
     last_d_state = utils.latest_checkpoint_path(state_dir, "D_*.pth")
     last_g_state = utils.latest_checkpoint_path(state_dir, "G_*.pth")
+
+    if augment:
+        # load embedder
+        embedder_filepath, _, embedder_load_from = get_embedder(embedder_name)
+
+        if embedder_load_from == "local":
+            embedder_filepath = os.path.join(
+                MODELS_DIR, "embeddings", embedder_filepath
+            )
+        embedder, _ = load_embedder(embedder_filepath, device)
+        if not config.train.fp16_run:
+            embedder = embedder.float()
+
+        if (augment_path is not None):
+            state_dict = torch.load(augment_path, map_location="cpu")
+            if state_dict["f0"] == 1:
+                augment_net_g = SynthesizerTrnMs256NSFSid(
+                    **state_dict["params"], is_half=config.train.fp16_run
+                )
+                augment_speaker_info = np.load(speaker_info_path)
+            else:
+                augment_net_g = SynthesizerTrnMs256NSFSidNono(
+                    **state_dict["params"], is_half=config.train.fp16_run
+                )
+
+            augment_net_g.load_state_dict(state_dict["weight"], strict=False)
+            augment_net_g.eval().to(device)
+
+            if config.train.fp16_run:
+                augment_net_g = augment_net_g.half()
+            else:
+                augment_net_g= augment_net_g.float()
+        else:
+            augment_net_g = net_g
+            if f0:
+                medians = [[] for _ in range(augment_net_g.spk_embed_dim)]
+                for file in training_meta.files.values():
+                    f0f = np.load(file.f0nsf)
+                    if np.any(f0f > 0):
+                        medians[file.speaker_id].append(np.median(f0f[f0f > 0]))
+                augment_speaker_info = np.array([np.median(x) if len(x) else 0. for x in medians])
 
     if last_d_state is None or last_g_state is None:
         epoch = 1
@@ -681,9 +750,12 @@ def training_runner(
                         )
 
             with autocast(enabled=config.train.fp16_run):
-                if f0 and augment:
+                if augment:
                     with torch.no_grad():
-                        new_phone = change_speaker(net_g, embedder, embedding_output_layer, phone, phone_lengths, pitch, pitchf, spec_lengths, sid)
+                        if type(augment_net_g) == SynthesizerTrnMs256NSFSid:
+                            new_phone = change_speaker(augment_net_g, augment_speaker_info, embedder, embedding_output_layer, phone, phone_lengths, pitch, pitchf, spec_lengths)
+                        else:
+                            new_phone = change_speaker_nono(augment_net_g, embedder, embedding_output_layer, phone, phone_lengths, spec_lengths)
                         weight = np.power(.5, step / len(train_dataset))  # 学習の初期はそのままのphone embeddingを使う
                         phone = phone * weight + new_phone * (1. - weight)
 
