@@ -6,7 +6,8 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
-from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from lib.rvc.train import (create_dataset_meta, glob_dataset, train_index,
+                           train_model)
 from modules import models, utils
 from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
@@ -141,6 +142,7 @@ class Training(Tab):
             norm_audio_when_preprocess,
             pitch_extraction_algo,
             batch_size,
+            augment,
             cache_batch,
             num_epochs,
             save_every_epoch,
@@ -243,6 +245,7 @@ class Training(Tab):
                 sampling_rate_str,
                 f0,
                 batch_size,
+                augment,
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
@@ -359,6 +362,7 @@ class Training(Tab):
                             step=1,
                             label="Save every epoch",
                         )
+                        augment = gr.Checkbox(label="Augment", value=False)
                         cache_batch = gr.Checkbox(label="Cache batch", value=True)
                         fp16 = gr.Checkbox(
                             label="FP16", value=half_support, disabled=not half_support
@@ -438,6 +442,7 @@ class Training(Tab):
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 batch_size,
+                augment,
                 cache_batch,
                 num_epochs,
                 save_every_epoch,

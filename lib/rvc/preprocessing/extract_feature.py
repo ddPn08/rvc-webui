@@ -11,6 +11,22 @@ import torch.nn.functional as F
 from fairseq import checkpoint_utils
 from tqdm import tqdm
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+MODELS_DIR = os.path.join(ROOT_DIR, "models")
+EMBEDDINGS_LIST = {
+    "hubert-base-japanese": (
+        "rinna_hubert_base_jp.pt",
+        "hubert-base-japanese",
+        "local",
+    ),
+    "contentvec": ("checkpoint_best_legacy_500.pt", "contentvec", "local"),
+}
+
+def get_embedder(embedder_name):
+    if embedder_name in EMBEDDINGS_LIST:
+        return EMBEDDINGS_LIST[embedder_name]
+    return None
+
 
 def load_embedder(embedder_path: str, device):
     try:
