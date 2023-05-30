@@ -488,7 +488,7 @@ def training_runner(
             config.train.segment_size // config.data.hop_length,
             **config.model.dict(),
             is_half=config.train.fp16_run,
-            sr=sample_rate,
+            sr=int(sample_rate[:-1] + "000"),
         )
     else:
         net_g = SynthesizerTrnMs256NSFSidNono(
@@ -496,6 +496,7 @@ def training_runner(
             config.train.segment_size // config.data.hop_length,
             **config.model.dict(),
             is_half=config.train.fp16_run,
+            sr=int(sample_rate[:-1] + "000"),
         )
 
     if is_multi_process:
@@ -573,6 +574,7 @@ def training_runner(
                     if np.any(f0f > 0):
                         medians[file.speaker_id].append(np.median(f0f[f0f > 0]))
                 augment_speaker_info = np.array([np.median(x) if len(x) else 0. for x in medians])
+                np.save(os.path.join(training_dir, "speaker_info.npy"), augment_speaker_info)
 
     if last_d_state is None or last_g_state is None:
         epoch = 1
