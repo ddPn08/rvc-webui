@@ -6,7 +6,8 @@ from multiprocessing import cpu_count
 import gradio as gr
 
 from lib.rvc.preprocessing import extract_f0, extract_feature, split
-from lib.rvc.train import create_dataset_meta, glob_dataset, train_index, train_model
+from lib.rvc.train import (create_dataset_meta, glob_dataset, train_index,
+                           train_model)
 from modules import models, utils
 from modules.shared import MODELS_DIR, device, half_support
 from modules.ui import Tab
@@ -141,6 +142,10 @@ class Training(Tab):
             norm_audio_when_preprocess,
             pitch_extraction_algo,
             batch_size,
+            augment,
+            augment_from_pretrain,
+            augment_path,
+            speaker_info_path,
             cache_batch,
             num_epochs,
             save_every_epoch,
@@ -234,6 +239,10 @@ class Training(Tab):
             )
             out_dir = os.path.join(MODELS_DIR, "checkpoints")
 
+            if not augment_from_pretrain:
+                augment_path = None
+                speaker_info_path = None
+
             train_model(
                 gpu_ids,
                 config,
@@ -243,6 +252,9 @@ class Training(Tab):
                 sampling_rate_str,
                 f0,
                 batch_size,
+                augment,
+                augment_path,
+                speaker_info_path,
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
@@ -364,6 +376,17 @@ class Training(Tab):
                             label="FP16", value=half_support, disabled=not half_support
                         )
                     with gr.Row().style(equal_height=False):
+                        augment = gr.Checkbox(label="Augment", value=False)
+                        augment_from_pretrain = gr.Checkbox(label="Augment From Pretrain", value=False)
+                        augment_path = gr.Textbox(
+                            label="Pre trained generator path (pth)",
+                            value="file is not prepared"
+                        )
+                        speaker_info_path = gr.Textbox(
+                            label="speaker info path (npy)",
+                            value="file is not prepared"
+                        )
+                    with gr.Row().style(equal_height=False):
                         pre_trained_generator = gr.Textbox(
                             label="Pre trained generator path",
                             value=os.path.join(
@@ -438,6 +461,10 @@ class Training(Tab):
                 norm_audio_when_preprocess,
                 pitch_extraction_algo,
                 batch_size,
+                augment,
+                augment_from_pretrain,
+                augment_path,
+                speaker_info_path,
                 cache_batch,
                 num_epochs,
                 save_every_epoch,

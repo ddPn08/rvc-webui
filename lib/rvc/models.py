@@ -525,6 +525,7 @@ class SynthesizerTrnMs256NSFSid(nn.Module):
         self.segment_size = segment_size
         self.gin_channels = gin_channels
         self.emb_channels = emb_channels
+        self.sr = sr
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
         self.enc_p = TextEncoder(
@@ -644,6 +645,7 @@ class SynthesizerTrnMs256NSFSidNono(nn.Module):
         self.segment_size = segment_size
         self.gin_channels = gin_channels
         self.emb_channels = emb_channels
+        self.sr = sr
         # self.hop_length = hop_length#
         self.spk_embed_dim = spk_embed_dim
         self.enc_p = TextEncoder(
