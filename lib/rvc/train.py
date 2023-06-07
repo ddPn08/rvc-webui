@@ -443,9 +443,13 @@ def training_runner(
         os.makedirs(state_dir, exist_ok=True)
         writer = SummaryWriter(log_dir=log_dir)
 
-    dist.init_process_group(
-        backend="gloo", init_method="env://", rank=rank, world_size=world_size
-    )
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    if not dist.is_initialized():
+        dist.init_process_group(
+            backend="gloo", init_method="env://", rank=rank, world_size=world_size
+        )
 
     if is_multi_process:
         torch.cuda.set_device(rank)
