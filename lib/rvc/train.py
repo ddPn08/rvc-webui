@@ -13,6 +13,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torchaudio
 import tqdm
+import json
 from sklearn.cluster import MiniBatchKMeans
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
@@ -56,33 +57,37 @@ def glob_dataset(
     recursive: bool = True,
 ):
     globs = glob_str.split(",")
+    speaker_count = 0
     datasets_speakers = []
+    speaker_to_id_mapping = {}
     for glob_str in globs:
         if os.path.isdir(glob_str):
-            files = os.listdir(glob_str)
             if multiple_speakers:
-                # pattern: {glob_str}/{decimal}[_]* and isdir
-                multi_speakers_dir = [
-                    (os.path.join(glob_str, f), int(f.split("_")[0]))
-                    for f in files
-                    if os.path.isdir(os.path.join(glob_str, f))
-                    and f.split("_")[0].isdecimal()
-                ]
-
-                if len(multi_speakers_dir) > 0:
-                    # multi speakers at once train
-                    datasets_speakers = [
-                        (file, dir[1])
-                        for dir in multi_speakers_dir
-                        for file in glob.iglob(
-                            os.path.join(dir[0], "*"), recursive=recursive
-                        )
-                        if is_audio_file(file)
-                    ]
-                    continue
+                # Multispeaker format:
+                # dataset_path/
+                # - speakername/
+                #     - {wav name here}.wav
+                #     - ...
+                # - next_speakername/
+                #     - {wav name here}.wav
+                #     - ...
+                # - ...
+                print("Multispeaker dataset enabled; Processing speakers.")
+                for dir in tqdm.tqdm(os.listdir(glob_str)):
+                    print("Speaker ID " + str(speaker_count) + ": " + dir)
+                    speaker_to_id_mapping[dir] = speaker_count
+                    speaker_path = glob_str + "/" + dir
+                    for audio in tqdm.tqdm(os.listdir(speaker_path)):
+                        if is_audio_file(glob_str + "/" + dir + "/" + audio):
+                            datasets_speakers.append((glob_str + "/" + dir + "/" + audio, speaker_count))
+                    speaker_count += 1
+                with open("./speaker_info.json", "w") as outfile:
+                    print("Dumped speaker info to ./speaker_info.json")
+                    json.dump(speaker_to_id_mapping, outfile)
+                continue # Skip the normal speaker extend
 
             glob_str = os.path.join(glob_str, "**", "*")
-
+        print("Single speaker dataset enabled; Processing speaker as ID " + str(speaker_id) + ".")
         datasets_speakers.extend(
             [
                 (file, speaker_id)
@@ -91,7 +96,7 @@ def glob_dataset(
             ]
         )
 
-    return sorted(datasets_speakers, key=operator.itemgetter(0))
+    return sorted(datasets_speakers)
 
 
 def create_dataset_meta(training_dir: str, f0: bool):
