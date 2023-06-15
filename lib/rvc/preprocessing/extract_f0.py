@@ -22,7 +22,7 @@ def get_optimal_torch_device(index: int = 0) -> torch.device:
     # Else wise return the "cpu" as a torch device, 
     return torch.device("cpu")
 
-def get_f0_official_crepe_computation( # Currently errors on the predict call w/ TypeError: can't convert np.ndarray of type numpy.uint16. The only supported types are: float64, float32, float16, complex64, complex128, int64, int32, int16, int8, uint8, and bool.
+def get_f0_official_crepe_computation(
         x,
         sr,
         f0_min,
