@@ -5,9 +5,91 @@ from typing import *
 
 import numpy as np
 import pyworld
+import torch
+import torchcrepe
+from torch import Tensor
 from tqdm import tqdm
 
 from lib.rvc.utils import load_audio
+
+def get_optimal_torch_device(index: int = 0) -> torch.device:
+    # Get cuda device
+    if torch.cuda.is_available():
+        return torch.device(f"cuda:{index % torch.cuda.device_count()}") # Very fast
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    # Insert an else here to grab "xla" devices if available. TO DO later. Requires the torch_xla.core.xla_model library
+    # Else wise return the "cpu" as a torch device, 
+    return torch.device("cpu")
+
+def get_f0_official_crepe_computation(
+        x,
+        sr,
+        f0_min,
+        f0_max,
+        model="full",
+):
+    batch_size = 512
+    torch_device = get_optimal_torch_device()
+    audio = torch.tensor(np.copy(x))[None].float()
+    f0, pd = torchcrepe.predict(
+        audio,
+        sr,
+        160,
+        f0_min,
+        f0_max,
+        model,
+        batch_size=batch_size,
+        device=torch_device,
+        return_periodicity=True,
+    )
+    pd = torchcrepe.filter.median(pd, 3)
+    f0 = torchcrepe.filter.mean(f0, 3)
+    f0[pd < 0.1] = 0
+    f0 = f0[0].cpu().numpy()
+    f0 = f0[1:] # Get rid of extra first frame
+    return f0
+
+def get_f0_crepe_computation(
+        x, 
+        sr,
+        f0_min,
+        f0_max,
+        hop_length=160, # 512 before. Hop length changes the speed that the voice jumps to a different dramatic pitch. Lower hop lengths means more pitch accuracy but longer inference time.
+        model="full", # Either use crepe-tiny "tiny" or crepe "full". Default is full
+):
+    x = x.astype(np.float32) # fixes the F.conv2D exception. We needed to convert double to float.
+    x /= np.quantile(np.abs(x), 0.999)
+    torch_device = get_optimal_torch_device()
+    audio = torch.from_numpy(x).to(torch_device, copy=True)
+    audio = torch.unsqueeze(audio, dim=0)
+    if audio.ndim == 2 and audio.shape[0] > 1:
+        audio = torch.mean(audio, dim=0, keepdim=True).detach()
+    audio = audio.detach()
+    print("Initiating prediction with a crepe_hop_length of: " + str(hop_length))
+    pitch: Tensor = torchcrepe.predict(
+        audio,
+        sr,
+        hop_length,
+        f0_min,
+        f0_max,
+        model,
+        batch_size=hop_length * 2,
+        device=torch_device,
+        pad=True
+    )
+    p_len = x.shape[0] // hop_length
+    # Resize the pitch for final f0
+    source = np.array(pitch.squeeze(0).cpu().float().numpy())
+    source[source < 0.001] = np.nan
+    target = np.interp(
+        np.arange(0, len(source) * p_len, len(source)) / p_len,
+        np.arange(0, len(source)),
+        source
+    )
+    f0 = np.nan_to_num(target)
+    f0 = f0[1:] # Get rid of extra first frame
+    return f0 # Resized f0
 
 
 def compute_f0(
@@ -37,6 +119,10 @@ def compute_f0(
             frame_period=1000 * hop / fs,
         )
         f0 = pyworld.stonemask(x.astype(np.double), f0, t, fs)
+    elif f0_method == "mangio-crepe":
+        f0 = get_f0_crepe_computation(x, fs, f0_min, f0_max, 160, "full")
+    elif f0_method == "crepe":
+        f0 = get_f0_official_crepe_computation(x.astype(np.double), fs, f0_min, f0_max, "full")
     return f0
 
 
