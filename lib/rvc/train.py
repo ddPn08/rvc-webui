@@ -13,7 +13,6 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torchaudio
 import tqdm
-import json
 from sklearn.cluster import MiniBatchKMeans
 from torch.cuda.amp import GradScaler, autocast
 from torch.nn import functional as F
@@ -57,37 +56,33 @@ def glob_dataset(
     recursive: bool = True,
 ):
     globs = glob_str.split(",")
-    speaker_count = 0
     datasets_speakers = []
-    speaker_to_id_mapping = {}
     for glob_str in globs:
         if os.path.isdir(glob_str):
+            files = os.listdir(glob_str)
             if multiple_speakers:
-                # Multispeaker format:
-                # dataset_path/
-                # - speakername/
-                #     - {wav name here}.wav
-                #     - ...
-                # - next_speakername/
-                #     - {wav name here}.wav
-                #     - ...
-                # - ...
-                print("Multispeaker dataset enabled; Processing speakers.")
-                for dir in tqdm.tqdm(os.listdir(glob_str)):
-                    print("Speaker ID " + str(speaker_count) + ": " + dir)
-                    speaker_to_id_mapping[dir] = speaker_count
-                    speaker_path = glob_str + "/" + dir
-                    for audio in tqdm.tqdm(os.listdir(speaker_path)):
-                        if is_audio_file(glob_str + "/" + dir + "/" + audio):
-                            datasets_speakers.append((glob_str + "/" + dir + "/" + audio, speaker_count))
-                    speaker_count += 1
-                with open("./speaker_info.json", "w") as outfile:
-                    print("Dumped speaker info to ./speaker_info.json")
-                    json.dump(speaker_to_id_mapping, outfile)
-                continue # Skip the normal speaker extend
+                # pattern: {glob_str}/{decimal}[_]* and isdir
+                multi_speakers_dir = [
+                    (os.path.join(glob_str, f), int(f.split("_")[1]))
+                    for f in files
+                    if os.path.isdir(os.path.join(glob_str, f))
+                    and f.split("_")[1].isdecimal()
+                ]
+
+                if len(multi_speakers_dir) > 0:
+                    # multi speakers at once train
+                    datasets_speakers = [
+                        (file, dir[1])
+                        for dir in multi_speakers_dir
+                        for file in glob.iglob(
+                            os.path.join(dir[0], "*"), recursive=recursive
+                        )
+                        if is_audio_file(file)
+                    ]
+                    continue
 
             glob_str = os.path.join(glob_str, "**", "*")
-        print("Single speaker dataset enabled; Processing speaker as ID " + str(speaker_id) + ".")
+
         datasets_speakers.extend(
             [
                 (file, speaker_id)
@@ -96,7 +91,7 @@ def glob_dataset(
             ]
         )
 
-    return sorted(datasets_speakers)
+    return sorted(datasets_speakers, key=operator.itemgetter(0))
 
 
 def create_dataset_meta(training_dir: str, f0: bool):
@@ -116,7 +111,7 @@ def create_dataset_meta(training_dir: str, f0: bool):
     if f0:
         f0_dir = os.path.join(training_dir, "2a_f0")
         f0nsf_dir = os.path.join(training_dir, "2b_f0nsf")
-        names = names & set(list_data(f0_dir)) & set(list_data(f0nsf_dir))
+        names = set(list_data(f0_dir)) & set(list_data(f0nsf_dir))
 
     meta = {
         "files": {},
@@ -453,7 +448,7 @@ def training_runner(
 
     if not dist.is_initialized():
         dist.init_process_group(
-            backend="gloo", init_method="env://", rank=rank, world_size=world_size
+            backend="nccl", init_method="env://", rank=rank, world_size=world_size
         )
 
     if is_multi_process:
@@ -482,7 +477,7 @@ def training_runner(
 
     train_loader = DataLoader(
         train_dataset,
-        num_workers=4,
+        num_workers=6,
         shuffle=False,
         pin_memory=True,
         collate_fn=collate_fn,
@@ -627,9 +622,9 @@ def training_runner(
                     emb_phone_size,
                 )
             if is_multi_process:
-                net_g.module.load_state_dict(net_g_state)
+                net_g.module.load_state_dict(net_g_state,strict=False)
             else:
-                net_g.load_state_dict(net_g_state)
+                net_g.load_state_dict(net_g_state,strict=False)
 
             del net_g_state
 
@@ -799,8 +794,7 @@ def training_runner(
                 y_mel = commons.slice_segments(
                     mel, ids_slice, config.train.segment_size // config.data.hop_length
                 )
-                with autocast(enabled=False):
-                    y_hat_mel = mel_spectrogram_torch(
+                y_hat_mel = mel_spectrogram_torch(
                         y_hat.float().squeeze(1),
                         config.data.filter_length,
                         config.data.n_mel_channels,
@@ -810,8 +804,8 @@ def training_runner(
                         config.data.mel_fmin,
                         config.data.mel_fmax,
                     )
-                if config.train.fp16_run == True and device != torch.device("mps"):
-                    y_hat_mel = y_hat_mel.half()
+                #if config.train.fp16_run == True and device != torch.device("mps"):
+                #    y_hat_mel = y_hat_mel.half()
                 wave = commons.slice_segments(
                     wave, ids_slice * config.data.hop_length, config.train.segment_size
                 )  # slice
