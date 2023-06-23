@@ -135,6 +135,7 @@ def pipeline(
                 alpha,
                 is_normalize,
             )
+            idx1 += 1
 
 
 def preprocess_audio(
