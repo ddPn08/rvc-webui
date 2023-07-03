@@ -149,6 +149,7 @@ class Training(Tab):
             cache_batch,
             num_epochs,
             save_every_epoch,
+            save_wav_with_checkpoint,
             fp16,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
@@ -182,6 +183,7 @@ class Training(Tab):
                 speaker_id,
                 multiple_speakers=multiple_speakers,
                 recursive=recursive,
+                training_dir=training_dir
             )
 
             if len(datasets) == 0:
@@ -258,6 +260,7 @@ class Training(Tab):
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
+                save_wav_with_checkpoint,
                 pre_trained_bottom_model_g,
                 pre_trained_bottom_model_d,
                 embedder_name,
@@ -371,6 +374,7 @@ class Training(Tab):
                             step=1,
                             label="Save every epoch",
                         )
+                        save_wav_with_checkpoint = gr.Checkbox(label="save_wav_with_checkpoint", value=False)
                         cache_batch = gr.Checkbox(label="Cache batch", value=True)
                         fp16 = gr.Checkbox(
                             label="FP16", value=half_support, disabled=not half_support
@@ -468,6 +472,7 @@ class Training(Tab):
                 cache_batch,
                 num_epochs,
                 save_every_epoch,
+                save_wav_with_checkpoint,
                 fp16,
                 pre_trained_generator,
                 pre_trained_discriminator,

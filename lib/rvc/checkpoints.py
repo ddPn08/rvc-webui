@@ -21,6 +21,7 @@ def create_trained_model(
     emb_ch: int,
     emb_output_layer: int,
     epoch: int,
+    speaker_info: Optional[dict[str, int]]
 ):
     state_dict = OrderedDict()
     state_dict["weight"] = {}
@@ -47,7 +48,7 @@ def create_trained_model(
                 "upsample_rates": [10, 10, 2, 2],
                 "upsample_initial_channel": 512,
                 "upsample_kernel_sizes": [16, 16, 4, 4],
-                "spk_embed_dim": 109,
+                "spk_embed_dim": 109 if speaker_info is None else len(speaker_info),
                 "gin_channels": 256,
                 "emb_channels": emb_ch,
                 "sr": 40000,
@@ -72,7 +73,7 @@ def create_trained_model(
                 "upsample_rates": [10, 6, 2, 2, 2],
                 "upsample_initial_channel": 512,
                 "upsample_kernel_sizes": [16, 16, 4, 4, 4],
-                "spk_embed_dim": 109,
+                "spk_embed_dim": 109 if speaker_info is None else len(speaker_info),
                 "gin_channels": 256,
                 "emb_channels": emb_ch,
                 "sr": 48000,
@@ -97,7 +98,7 @@ def create_trained_model(
                 "upsample_rates": [10, 4, 2, 2, 2],
                 "upsample_initial_channel": 512,
                 "upsample_kernel_sizes": [16, 16, 4, 4, 4],
-                "spk_embed_dim": 109,
+                "spk_embed_dim": 109 if speaker_info is None else len(speaker_info),
                 "gin_channels": 256,
                 "emb_channels": emb_ch,
                 "sr": 32000,
@@ -109,6 +110,8 @@ def create_trained_model(
     state_dict["f0"] = 1 if f0 else 0
     state_dict["embedder_name"] = emb_name
     state_dict["embedder_output_layer"] = emb_output_layer
+    if not speaker_info is None:
+        state_dict["speaker_info"] = {str(v): str(k) for k, v in speaker_info.items()}
     return state_dict
 
 
@@ -122,6 +125,7 @@ def save(
     emb_output_layer: int,
     filepath: str,
     epoch: int,
+    speaker_info: Optional[dict[str, int]]
 ):
     if hasattr(model, "module"):
         state_dict = model.module.state_dict()
@@ -139,6 +143,7 @@ def save(
         emb_ch,
         emb_output_layer,
         epoch,
+        speaker_info
     )
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     torch.save(state_dict, filepath)
