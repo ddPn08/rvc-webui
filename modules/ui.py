@@ -140,7 +140,7 @@ def create_ui():
 def create_model_list_ui(speaker_id: bool = True, load: bool = True):
     speaker_id_info = {
         "visible": False,
-        "maximum": 2333,
+        "maximum": 10000,
     }
 
     def reload_model(raw=False):
