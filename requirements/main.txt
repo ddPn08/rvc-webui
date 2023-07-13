@@ -13,6 +13,7 @@ pydub==0.25.1
 soxr==0.3.5
 transformers==4.28.1
 torchcrepe==0.0.20
+Flask==2.3.2
 
 tensorboard
 tensorboardX

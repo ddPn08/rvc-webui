@@ -7,7 +7,8 @@ from fairseq import checkpoint_utils
 from fairseq.models.hubert.hubert import HubertModel
 from pydub import AudioSegment
 
-from lib.rvc.models import SynthesizerTrnMs256NSFSid, SynthesizerTrnMs256NSFSidNono
+from lib.rvc.models import (SynthesizerTrnMs256NSFSid,
+                            SynthesizerTrnMs256NSFSidNono)
 from lib.rvc.pipeline import VocalConvertPipeline
 
 from .cmd_opts import opts
@@ -57,10 +58,17 @@ def update_state_dict(state_dict):
         i = i - n
         if len(state_dict["config"]) != 19 and key == "emb_channels":
             # backward compat.
-            state_dict["params"][key] = 256
             n += 1
             continue
         state_dict["params"][key] = state_dict["config"][i]
+
+    if not "emb_channels" in state_dict["params"]:
+        if state_dict.get("version", "v1") == "v1":
+            state_dict["params"]["emb_channels"] = 256  # for backward compat.
+            state_dict["embedder_output_layer"] = 9
+        else:
+            state_dict["params"]["emb_channels"] = 768  # for backward compat.
+            state_dict["embedder_output_layer"] = 12
 
 
 class VoiceConvertModel:
