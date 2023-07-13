@@ -131,7 +131,7 @@ class Merge(Tab):
 
         with gr.Group():
             with gr.Column():
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     model_a = gr.Dropdown(choices=models.get_models(), label="Model A")
                     model_b = gr.Dropdown(choices=models.get_models(), label="Model B")
                     model_c = gr.Dropdown(choices=models.get_models(), label="Model C")
@@ -139,7 +139,7 @@ class Merge(Tab):
                     reload_model_button.click(
                         reload_model, outputs=[model_a, model_b, model_c]
                     )
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     method = gr.Radio(
                         label="Merge method",
                         choices=list(MERGE_METHODS.values()),
@@ -147,7 +147,7 @@ class Merge(Tab):
                     )
                     output_name = gr.Textbox(label="Output name")
                     each_key = gr.Checkbox(label="Each key merge")
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     base_alpha = gr.Slider(
                         label="Base alpha", minimum=0, maximum=1, value=0.5, step=0.01
                     )
@@ -157,7 +157,7 @@ class Merge(Tab):
 
                 def create_weight_ui(name: str, *keys_list: List[List[str]]):
                     with gr.Accordion(label=name, open=False):
-                        with gr.Row().style(equal_height=False):
+                        with gr.Row(equal_height=False):
                             for keys in keys_list:
                                 with gr.Column():
                                     for key in keys:
@@ -264,7 +264,7 @@ class Merge(Tab):
                             )
 
                 with gr.Accordion(label="Inference options", open=False):
-                    with gr.Row().style(equal_height=False):
+                    with gr.Row(equal_height=False):
                         speaker_id = gr.Slider(
                             minimum=0,
                             maximum=2333,
@@ -287,12 +287,12 @@ class Merge(Tab):
                         fo_curve_file,
                     ) = inference_options_ui(show_out_dir=False)
 
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     with gr.Column():
                         status = gr.Textbox(value="", label="Status")
                         audio_output = gr.Audio(label="Output", interactive=False)
 
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     merge_and_save_button = gr.Button(
                         "Merge and save", variant="primary"
                     )

@@ -40,11 +40,11 @@ class Split(Tab):
 
         with gr.Group():
             with gr.Column():
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     input_audio = gr.Textbox(label="Input Audio (File or Directory)")
                     output_dir = gr.Textbox(label="Output Directory")
 
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     silence_thresh = gr.Number(value=-40, label="Silence Threshold")
                     min_silence_len = gr.Number(
                         value=750, label="Minimum Silence Length"
@@ -53,13 +53,13 @@ class Split(Tab):
                     margin = gr.Number(value=0, label="Margin")
                     padding = gr.Checkbox(value=True, label="Padding")
 
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     min = gr.Number(value=1000, label="Minimum audio length")
                     max = gr.Number(value=5000, label="Maximum audio length")
 
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     status = gr.Textbox(value="", label="Status")
-                with gr.Row().style(equal_height=False):
+                with gr.Row(equal_height=False):
                     separate_button = gr.Button("Separate", variant="primary")
 
         separate_button.click(

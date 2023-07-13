@@ -9,7 +9,7 @@ from modules.ui import Tab
 
 
 def inference_options_ui(show_out_dir=True):
-    with gr.Row().style(equal_height=False):
+    with gr.Row(equal_height=False):
         with gr.Column():
             source_audio = gr.Textbox(label="Source Audio")
             out_dir = gr.Textbox(
@@ -140,7 +140,7 @@ class Inference(Tab):
                         f0_curve_file,
                     ) = inference_options_ui()
 
-                    with gr.Row().style(equal_height=False):
+                    with gr.Row(equal_height=False):
                         with gr.Column():
                             status = gr.Textbox(value="", label="Status")
                             output = gr.Audio(label="Output", interactive=False)
