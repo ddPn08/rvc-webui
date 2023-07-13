@@ -1,6 +1,5 @@
 import io
 import json
-import os
 
 import gradio as gr
 import requests
@@ -8,7 +7,6 @@ import soundfile as sf
 import torch.multiprocessing as multiprocessing
 from scipy.io.wavfile import write
 
-from modules.shared import ROOT_DIR
 from modules.ui import Tab
 from server import app
 
@@ -17,15 +15,15 @@ proc = None
 def server_options_ui(show_out_dir=True):
     with gr.Row().style(equal_height=False):
         with gr.Row():
-            host = gr.Textbox(value="127.0.0.1", label="RVC model file path")
-            port = gr.Textbox(value="5001", label="Faiss index file path")
+            host = gr.Textbox(value="127.0.0.1", label="host")
+            port = gr.Textbox(value="5001", label="port")
     with gr.Row().style(equal_height=False):
         with gr.Row():
             rvc_model_file = gr.Textbox(value="", label="RVC model file path")
             faiss_index_file = gr.Textbox(value="", label="Faiss index file path")
     with gr.Row().style(equal_height=False):
         with gr.Row():
-            input_voice_file = gr.Textbox(value="", label="convert voice file path")
+            input_voice_file = gr.Textbox(value="", label="input voice file path")
             speaker_id = gr.Number(
                 value=0,
                 label="speaker_id",
@@ -45,8 +43,6 @@ def server_options_ui(show_out_dir=True):
                 step=0.01,
                 label="retrieval_feature_ratio",
             )
-
-
     return (
         host,
         port,
@@ -71,21 +67,10 @@ class Server(Tab):
 
     def ui(self, outlet):
         def start(host, port):
-            global proc
-
             if multiprocessing.get_start_method() == 'fork':
                 multiprocessing.set_start_method('spawn', force=True)
-            #os.environ["PATH"] = (
-            #    os.path.join(ROOT_DIR, "bin")
-            #    + os.pathsep
-            #    + os.environ.get("PATH", "")
-            #)
             proc = multiprocessing.Process(target = run, kwargs = {'host': host, 'port': port})
             proc.start()
-            # デバッグ用
-            # import subprocess
-            # os.environ["FLASK_APP"] = os.path.join(ROOT_DIR, "server.py")
-            # subprocess.Popen(f"flask run --host {host} --port {port}", shell=True)
             yield "start server"
 
         def upload(host, port, rvc_model_file, faiss_index_file):
