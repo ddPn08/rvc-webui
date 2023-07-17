@@ -96,7 +96,7 @@ def prepare_environment():
 
     torch_command = os.environ.get(
         "TORCH_COMMAND",
-        "pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118",
+        "pip install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cu118",
     )
 
     sys.argv, skip_install = extract_arg(sys.argv, "--skip-install")
@@ -106,10 +106,10 @@ def prepare_environment():
     sys.argv, reinstall_torch = extract_arg(sys.argv, "--reinstall-torch")
     ngrok = "--ngrok" in sys.argv
 
-    if reinstall_torch or not is_installed("torch") or not is_installed("torchvision"):
+    if reinstall_torch or not is_installed("torch") or not is_installed("torchaudio"):
         run(
             f'"{python}" -m {torch_command}',
-            "Installing torch and torchvision",
+            "Installing torch and torchaudio",
             "Couldn't install torch",
         )
 
