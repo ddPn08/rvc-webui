@@ -2,6 +2,7 @@ import os
 import traceback
 from concurrent.futures import ProcessPoolExecutor
 from typing import *
+import multiprocessing as mp
 
 import numpy as np
 import pyworld
@@ -213,7 +214,7 @@ def run(training_dir: str, num_processes: int, f0_method: str):
         os.makedirs(dir[0], exist_ok=True)
         os.makedirs(dir[1], exist_ok=True)
 
-    with ProcessPoolExecutor() as executer:
+    with ProcessPoolExecutor(mp_context=mp.get_context("spawn")) as executer:
         for i in range(num_processes):
             executer.submit(processor, paths[i::num_processes], f0_method, process_id=i)
 
