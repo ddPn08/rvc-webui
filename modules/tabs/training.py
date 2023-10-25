@@ -150,6 +150,7 @@ class Training(Tab):
             save_every_epoch,
             save_wav_with_checkpoint,
             fp16,
+            save_only_last,
             pre_trained_bottom_model_g,
             pre_trained_bottom_model_d,
             run_train_index,
@@ -264,7 +265,7 @@ class Training(Tab):
                 pre_trained_bottom_model_d,
                 embedder_name,
                 int(embedding_output_layer),
-                False,
+                save_only_last,
                 None if len(gpu_ids) > 1 else device,
             )
 
@@ -380,6 +381,9 @@ class Training(Tab):
                         fp16 = gr.Checkbox(
                             label="FP16", value=half_support, disabled=not half_support
                         )
+                        save_only_last = gr.Checkbox(
+                            label="Save only the latest G and D files", value=False
+                        )
                     with gr.Row(equal_height=False):
                         augment = gr.Checkbox(label="Augment", value=False)
                         augment_from_pretrain = gr.Checkbox(
@@ -477,6 +481,7 @@ class Training(Tab):
                 save_every_epoch,
                 save_wav_with_checkpoint,
                 fp16,
+                save_only_last,
                 pre_trained_generator,
                 pre_trained_discriminator,
                 run_train_index,
