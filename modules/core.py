@@ -102,7 +102,7 @@ def install_ffmpeg():
         return
     tmpdir = os.path.join(ROOT_DIR, "tmp")
     url = (
-        "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-5.1.2-essentials_build.zip"
+        "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-6.0-essentials_build.zip"
     )
     out = os.path.join(tmpdir, "ffmpeg.zip")
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -110,7 +110,7 @@ def install_ffmpeg():
     shutil.unpack_archive(out, os.path.join(tmpdir, "ffmpeg"))
     shutil.copyfile(
         os.path.join(
-            tmpdir, "ffmpeg", "ffmpeg-5.1.2-essentials_build", "bin", "ffmpeg.exe"
+            tmpdir, "ffmpeg", "ffmpeg-6.0-essentials_build", "bin", "ffmpeg.exe"
         ),
         os.path.join(ROOT_DIR, "bin", "ffmpeg.exe"),
     )
